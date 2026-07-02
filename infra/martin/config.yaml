@@ -1,0 +1,28 @@
+# Martin tile server configuration
+# Docs: https://maplibre.org/martin/
+
+listen_addresses: "0.0.0.0:3000"
+
+# Long-lived worker pool sized for a single-node dev setup.
+worker_processes: 2
+
+# CORS — Martin's key is `origin`, not `allowed_origins`.
+cors:
+  origin:
+    - "http://localhost:5173"
+    - "http://localhost:5442"
+
+postgres:
+  connection_string: ${DATABASE_URL}
+  pool_size: 10
+
+  # Auto-publish every table/view with a geometry column in the dbo schema.
+  # We will NOT publish app.* — that's our application's own data.
+  auto_publish:
+    from_schemas:
+      - dbo
+    tables:
+      source_id_format: "{schema}.{table}"
+      id_columns: ogc_fid # ← was 'id', which doesn't exist on our tables
+    functions:
+      source_id_format: "{schema}.{function}"

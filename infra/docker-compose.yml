@@ -1,0 +1,49 @@
+name: geo-app
+
+services:
+  postgres:
+    image: supabase/postgres:15.14.1.095
+    container_name: geo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_HOST_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/bootstrap.sql:/docker-entrypoint-initdb.d/01-bootstrap.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supabase_admin -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - geo_net
+
+  martin:
+    image: ghcr.io/maplibre/martin:latest
+    container_name: geo-martin
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Martin reads this if no --postgres flag is passed.
+      # Uses the application role, not the superuser.
+      DATABASE_URL: postgres://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      RUST_LOG: martin=info
+    command: ["--config", "/config/config.yaml"]
+    ports:
+      - "${MARTIN_HOST_PORT}:3000"
+    volumes:
+      - ./martin/config.yaml:/config/config.yaml:ro
+    networks:
+      - geo_net
+
+volumes:
+  postgres_data:
+
+networks:
+  geo_net:
+    driver: bridge

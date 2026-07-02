@@ -1,0 +1,45 @@
+export type PointStyle = {
+  icon?: string;
+  size?: number;
+  color?: string;
+  halo_color?: string;
+  halo_width?: number;
+  opacity?: number;
+  minzoom?: number;
+  render_as?: "symbol" | "circle"; // ← ADD
+};
+
+export type LineStyle = {
+  color?: string;
+  width?: number;
+  opacity?: number;
+  dash?: number[];
+};
+
+export type PolygonStyle = {
+  fill_color?: string;
+  fill_opacity?: number;
+  outline_color?: string;
+  outline_width?: number;
+};
+
+export interface LayerStyle {
+  point?: PointStyle;
+  line?: LineStyle;
+  polygon?: PolygonStyle;
+}
+
+export interface Layer {
+  id: string;
+  name: string;
+  display_name: string;
+  schema_name: string;
+  table_name: string;
+  id_column: string;
+  geometry_column: string;
+  geometry_type: string;
+  srid: number;
+  editable: boolean;
+  style: LayerStyle;
+  tile_url: string;
+}
