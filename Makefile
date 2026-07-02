@@ -184,3 +184,27 @@ tidy: api-tidy ## Alias for api-tidy
 .PHONY: dev
 dev: ## Reminder how to run the dev stack
 	@echo "Two terminals:  make web-dev  |  make api-run"
+
+.PHONY: prod-build
+prod-build: ## Build all prod images
+	docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yaml build
+
+.PHONY: prod-up
+prod-up: ## Start the whole prod stack
+	docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yaml up -d --build
+
+.PHONY: prod-down
+prod-down: ## Stop the prod stack (keep data)
+	docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yaml down
+
+.PHONY: prod-nuke
+prod-nuke: ## Stop AND remove volumes (destroys DB!)
+	docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yaml down -v
+
+.PHONY: prod-logs
+prod-logs: ## Tail all prod logs
+	docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yaml logs -f --tail=100
+
+.PHONY: prod-ps
+prod-ps: ## Container status
+	docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yaml ps
