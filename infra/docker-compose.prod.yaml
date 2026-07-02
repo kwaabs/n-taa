@@ -94,7 +94,7 @@ services:
       interval: 15s
       timeout: 3s
       retries: 5
-      start_period: 15s
+      start_period: 30s
 
   # ─── Frontend (nginx serving built Vite bundle + API proxy) ──
   web:
