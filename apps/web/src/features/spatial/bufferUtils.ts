@@ -19,7 +19,7 @@ export function bufferFeature(
 
   return {
     type: "Feature",
-    id: `buffer-${source.id}-${radiusMeters}`,
+    id: Number(`buffer-${source.id}-${radiusMeters}`),
     geometry: buffered.geometry as Feature["geometry"],
     properties: {
       buffer_radius_m: radiusMeters,
