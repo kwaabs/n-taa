@@ -62,7 +62,7 @@ services:
   # ─── Go API ────────────────────────────────────────────
   api:
     build:
-      context: ../services/api
+      context: services/api
       dockerfile: Dockerfile
     container_name: geo-api
     restart: unless-stopped
@@ -100,7 +100,7 @@ services:
   # ─── Frontend (nginx serving built Vite bundle + API proxy) ──
   web:
     build:
-      context: ../apps/web
+      context: apps/web
       dockerfile: Dockerfile
       args:
         # Empty → same-origin. nginx routes /api/* to the api container.
