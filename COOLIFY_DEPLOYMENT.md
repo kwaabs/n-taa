@@ -159,6 +159,19 @@ curl -fsS https://taa.prwea.ecggh.com/api/v1/ping
 
 If any of these fail, jump to **Section 10 — Troubleshooting**.
 
+### 4b. Bootstrap the database (manual)
+
+The stack is designed to bootstrap the database manually — auto-init through
+docker-entrypoint-initdb.d is unreliable in PaaS environments.
+
+**Steps:**
+
+1. Open the Postgres container terminal in Coolify.
+2. Connect: `psql -U supabase_admin -d postgres`
+3. Paste the entire contents of `infra/postgres/bootstrap.sql`
+4. Verify:
+
+
 ---
 
 ## 5. Load Utility Data

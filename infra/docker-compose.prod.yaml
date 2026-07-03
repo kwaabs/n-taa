@@ -1,7 +1,6 @@
 # Production stack — postgres + martin + api + web
 # Usage:
 #   cp infra/.env.prod.example infra/.env.prod
-#   # edit infra/.env.prod
 #   docker compose --env-file infra/.env.prod -f infra/docker-compose.prod.yaml up -d --build
 
 name: geo-app-prod
@@ -23,15 +22,16 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      # These pass through to bootstrap.sql
       APP_DB_USER: ${APP_DB_USER}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/bootstrap.sql:/docker-entrypoint-initdb.d/01-bootstrap.sql:ro
     networks:
       - app_net
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "${POSTGRES_DB}"]
+      test:
+        ["CMD", "pg_isready", "-U", "supabase_admin", "-d", "${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 20
@@ -53,8 +53,6 @@ services:
     networks:
       - app_net
     ports:
-      # Exposed publicly so tile_url in DB can point directly.
-      # Comment this out and use the nginx /tiles/ proxy if you prefer.
       - "5441:3000"
 
   # ─── Go API ────────────────────────────────────────────
@@ -101,7 +99,6 @@ services:
       context: apps/web
       dockerfile: Dockerfile
       args:
-        # Empty → same-origin. nginx routes /api/* to the api container.
         VITE_API_URL: ""
     container_name: geo-web
     restart: unless-stopped

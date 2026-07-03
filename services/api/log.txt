@@ -1,0 +1,302 @@
+2026-Jul-02 17:46:00.903329 Starting deployment of kwaabs/n-taa:main-bw08sokcsgc0cc048wg0o8k4 to localhost.
+2026-Jul-02 17:46:01.793176 Preparing container with helper image: ghcr.io/coollabsio/coolify-helper:1.0.12
+2026-Jul-02 17:46:02.297711 [CMD]: docker stop -t 30 wk8cg8gocws4c48gk4sokw08
+2026-Jul-02 17:46:02.297711 Error response from daemon: No such container: wk8cg8gocws4c48gk4sokw08
+2026-Jul-02 17:46:02.814177 [CMD]: docker run -d --network coolify --name wk8cg8gocws4c48gk4sokw08  --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper:1.0.12
+2026-Jul-02 17:46:02.814177 967559640a68c00f39e18f72499d0100183909a7eaf5a75806956fb4b01f6239
+2026-Jul-02 17:46:04.901956 [CMD]: docker exec wk8cg8gocws4c48gk4sokw08 bash -c 'GIT_SSH_COMMAND="ssh -o ConnectTimeout=30 -p 22 -o Port=22 -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git ls-remote https://github.com/kwaabs/n-taa refs/heads/main'
+2026-Jul-02 17:46:04.901956 73fdf0966cc37bdb7e55f3eeb1414572621d3111	refs/heads/main
+2026-Jul-02 17:46:04.928391 ----------------------------------------
+2026-Jul-02 17:46:04.938699 Importing kwaabs/n-taa:main (commit sha 73fdf0966cc37bdb7e55f3eeb1414572621d3111) to /artifacts/wk8cg8gocws4c48gk4sokw08.
+2026-Jul-02 17:46:05.472110 [CMD]: docker exec wk8cg8gocws4c48gk4sokw08 bash -c 'git clone --depth=1 --recurse-submodules --shallow-submodules -b 'main' 'https://github.com/kwaabs/n-taa' '/artifacts/wk8cg8gocws4c48gk4sokw08' && cd '/artifacts/wk8cg8gocws4c48gk4sokw08' && if [ -f .gitmodules ]; then sed -i "s#git@\(.*\):#https://\1/#g" '/artifacts/wk8cg8gocws4c48gk4sokw08'/.gitmodules || true && git submodule sync && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git submodule update --init --recursive --depth=1; fi && cd '/artifacts/wk8cg8gocws4c48gk4sokw08' && GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" git lfs pull'
+2026-Jul-02 17:46:05.472110 Cloning into '/artifacts/wk8cg8gocws4c48gk4sokw08'...
+2026-Jul-02 17:46:08.584513 [CMD]: docker exec wk8cg8gocws4c48gk4sokw08 bash -c 'cd /artifacts/wk8cg8gocws4c48gk4sokw08 && git log -1 73fdf0966cc37bdb7e55f3eeb1414572621d3111 --pretty=%B'
+2026-Jul-02 17:46:08.584513 Update docker-compose.prod.yaml
+2026-Jul-02 17:46:09.108185 [CMD]: docker exec wk8cg8gocws4c48gk4sokw08 bash -c 'stat -c '%F' /artifacts/wk8cg8gocws4c48gk4sokw08/postgres/bootstrap.sql'
+2026-Jul-02 17:46:09.108185 stat: can't stat '/artifacts/wk8cg8gocws4c48gk4sokw08/postgres/bootstrap.sql': No such file or directory
+2026-Jul-02 17:46:09.578866 [CMD]: docker exec wk8cg8gocws4c48gk4sokw08 bash -c 'stat -c '%F' /artifacts/wk8cg8gocws4c48gk4sokw08/martin/config.yaml'
+2026-Jul-02 17:46:09.578866 stat: can't stat '/artifacts/wk8cg8gocws4c48gk4sokw08/martin/config.yaml': No such file or directory
+2026-Jul-02 17:46:16.040021 [CMD]: docker exec wk8cg8gocws4c48gk4sokw08 bash -c 'test -f /artifacts/wk8cg8gocws4c48gk4sokw08/services/api/Dockerfile && echo 'exists' || echo 'not found''
+2026-Jul-02 17:46:16.040021 exists
+2026-Jul-02 17:46:16.512977 [CMD]: docker exec wk8cg8gocws4c48gk4sokw08 bash -c 'cat /artifacts/wk8cg8gocws4c48gk4sokw08/services/api/Dockerfile'
+2026-Jul-02 17:46:16.512977 # --- Build stage ---------------------------------------------
+2026-Jul-02 17:46:16.512977 FROM golang:1.25-alpine AS builder
+2026-Jul-02 17:46:16.512977 
+2026-Jul-02 17:46:16.512977 WORKDIR /build
+2026-Jul-02 17:46:16.512977 
+2026-Jul-02 17:46:16.512977 # Cache module downloads across code changes
+2026-Jul-02 17:46:16.512977 COPY go.mod go.sum ./
+2026-Jul-02 17:46:16.512977 RUN go mod download
+2026-Jul-02 17:46:16.512977 
+2026-Jul-02 17:46:16.512977 # Build
+2026-Jul-02 17:46:16.512977 COPY . .
+2026-Jul-02 17:46:16.512977 RUN CGO_ENABLED=0 GOOS=linux go build \
+2026-Jul-02 17:46:16.512977 -ldflags="-s -w -X main.buildTime=$(date -u +%Y%m%d-%H%M%S)" \
+2026-Jul-02 17:46:16.512977 -o /out/api ./cmd/server
+2026-Jul-02 17:46:16.512977 
+2026-Jul-02 17:46:16.512977 # --- Runtime stage -------------------------------------------
+2026-Jul-02 17:46:16.512977 FROM alpine:3.20
+2026-Jul-02 17:46:16.512977 
+2026-Jul-02 17:46:16.512977 RUN apk add --no-cache ca-certificates tzdata curl && \
+2026-Jul-02 17:46:16.512977 adduser -D -u 10001 app
+2026-Jul-02 17:46:16.512977 
+2026-Jul-02 17:46:16.512977 WORKDIR /app
+2026-Jul-02 17:46:16.512977 COPY --from=builder /out/api /app/api
+2026-Jul-02 17:46:16.512977 
+2026-Jul-02 17:46:16.512977 USER app
+2026-Jul-02 17:46:16.512977 EXPOSE 5442
+2026-Jul-02 17:46:16.512977 
+2026-Jul-02 17:46:16.512977 # The API reads DATABASE_URL, JWT_SIGNING_KEY, etc. from env.
+2026-Jul-02 17:46:16.512977 # Provide them via docker-compose or `docker run -e`.
+2026-Jul-02 17:46:16.512977 ENTRYPOINT ["/app/api"]
+2026-Jul-02 17:46:16.995000 Added 60 ARG declarations to Dockerfile for service api (multi-stage build, added to 2 stages).
+2026-Jul-02 17:46:17.465467 [CMD]: docker exec wk8cg8gocws4c48gk4sokw08 bash -c 'test -f /artifacts/wk8cg8gocws4c48gk4sokw08/apps/web/Dockerfile && echo 'exists' || echo 'not found''
+2026-Jul-02 17:46:17.465467 exists
+2026-Jul-02 17:46:17.987042 [CMD]: docker exec wk8cg8gocws4c48gk4sokw08 bash -c 'cat /artifacts/wk8cg8gocws4c48gk4sokw08/apps/web/Dockerfile'
+2026-Jul-02 17:46:17.987042 # --- Build stage ---------------------------------------------
+2026-Jul-02 17:46:17.987042 FROM oven/bun:1-alpine AS builder
+2026-Jul-02 17:46:17.987042 
+2026-Jul-02 17:46:17.987042 WORKDIR /build
+2026-Jul-02 17:46:17.987042 
+2026-Jul-02 17:46:17.987042 # Cache dependencies
+2026-Jul-02 17:46:17.987042 COPY package.json bun.lock ./
+2026-Jul-02 17:46:17.987042 RUN bun install --frozen-lockfile
+2026-Jul-02 17:46:17.987042 
+2026-Jul-02 17:46:17.987042 # Copy source and build
+2026-Jul-02 17:46:17.987042 COPY . .
+2026-Jul-02 17:46:17.987042 
+2026-Jul-02 17:46:17.987042 # Build-time env — set to empty for same-origin API proxy (nginx routes /api ? api container)
+2026-Jul-02 17:46:17.987042 ARG VITE_API_URL=""
+2026-Jul-02 17:46:17.987042 ENV VITE_API_URL=$VITE_API_URL
+2026-Jul-02 17:46:17.987042 
+2026-Jul-02 17:46:17.987042 RUN bun run build
+2026-Jul-02 17:46:17.987042 
+2026-Jul-02 17:46:17.987042 # --- Runtime stage -------------------------------------------
+2026-Jul-02 17:46:17.987042 FROM nginx:1.27-alpine
+2026-Jul-02 17:46:17.987042 
+2026-Jul-02 17:46:17.987042 # Remove default config, add ours
+2026-Jul-02 17:46:17.987042 RUN rm /etc/nginx/conf.d/default.conf
+2026-Jul-02 17:46:17.987042 COPY nginx.conf /etc/nginx/conf.d/default.conf
+2026-Jul-02 17:46:17.987042 
+2026-Jul-02 17:46:17.987042 # Copy built static assets
+2026-Jul-02 17:46:17.987042 COPY --from=builder /build/dist /usr/share/nginx/html
+2026-Jul-02 17:46:17.987042 
+2026-Jul-02 17:46:17.987042 EXPOSE 80
+2026-Jul-02 17:46:17.987042 
+2026-Jul-02 17:46:17.987042 # Health-check aware startup
+2026-Jul-02 17:46:17.987042 CMD ["nginx", "-g", "daemon off;"]
+2026-Jul-02 17:46:18.532297 Added 60 ARG declarations to Dockerfile for service web (multi-stage build, added to 2 stages).
+2026-Jul-02 17:46:18.540756 Pulling & building required images.
+2026-Jul-02 17:46:18.596261 Creating build-time .env file in /artifacts (outside Docker context).
+2026-Jul-02 17:46:19.154727 Adding build arguments to Docker Compose build command.
+2026-Jul-02 17:46:19.950271 [CMD]: docker exec wk8cg8gocws4c48gk4sokw08 bash -c 'COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=xw48gss8ossc0wk4cgg8sw8k  docker compose --env-file /artifacts/build-time.env --project-name xw48gss8ossc0wk4cgg8sw8k --project-directory /artifacts/wk8cg8gocws4c48gk4sokw08 -f /artifacts/wk8cg8gocws4c48gk4sokw08/infra/docker-compose.prod.yaml build --pull --build-arg COOLIFY_URL --build-arg COOLIFY_FQDN --build-arg DB_CONN_MAX_LIFETIME --build-arg DB_MAX_IDLE_CONNS --build-arg JWT_SIGNING_KEY --build-arg JWT_ACCESS_TTL --build-arg APP_DB_PASSWORD --build-arg APP_DB_USER --build-arg API_ENV --build-arg POSTGRES_DB --build-arg DB_MAX_OPEN_CONNS --build-arg API_HOST --build-arg API_PORT --build-arg API_LOG_LEVEL --build-arg SUPERUSER_NAME --build-arg COOKIE_DOMAIN --build-arg COOKIE_SECURE --build-arg JWT_ISSUER --build-arg SERVICE_URL_MARTIN --build-arg JWT_REFRESH_TTL --build-arg SUPERUSER_EMAIL --build-arg SERVICE_FQDN_MARTIN --build-arg POSTGRES_PASSWORD --build-arg DATABASE_URL --build-arg CORS_ALLOWED_ORIGINS --build-arg SUPERUSER_PASSWORD --build-arg SERVICE_URL_API --build-arg SERVICE_FQDN_API --build-arg SERVICE_FQDN_WEB --build-arg SERVICE_URL_WEB --build-arg COOLIFY_BUILD_SECRETS_HASH=ed5eb109c16d027fdefc0f6fa38b7ffaffca4c3ff4bd068f49555e3bc64de115'
+2026-Jul-02 17:46:19.950271 #1 [internal] load local bake definitions
+2026-Jul-02 17:46:20.073149 #1 reading from stdin 4.11kB done
+2026-Jul-02 17:46:20.073149 #1 DONE 0.0s
+2026-Jul-02 17:46:20.244313 #2 [api internal] load build definition from Dockerfile
+2026-Jul-02 17:46:20.244313 #2 transferring dockerfile: 2.12kB done
+2026-Jul-02 17:46:20.244313 #2 DONE 0.0s
+2026-Jul-02 17:46:20.244313 
+2026-Jul-02 17:46:20.244313 #3 [web internal] load build definition from Dockerfile
+2026-Jul-02 17:46:20.244313 #3 transferring dockerfile: 2.15kB done
+2026-Jul-02 17:46:20.244313 #3 DONE 0.0s
+2026-Jul-02 17:46:20.244313 
+2026-Jul-02 17:46:20.244313 #4 [web internal] load metadata for docker.io/oven/bun:1-alpine
+2026-Jul-02 17:46:20.684861 #4 ...
+2026-Jul-02 17:46:20.684861 
+2026-Jul-02 17:46:20.684861 #5 [web internal] load metadata for docker.io/library/nginx:1.27-alpine
+2026-Jul-02 17:46:20.684861 #5 DONE 0.6s
+2026-Jul-02 17:46:20.793393 #6 [api internal] load metadata for docker.io/library/golang:1.25-alpine
+2026-Jul-02 17:46:20.793393 #6 DONE 0.7s
+2026-Jul-02 17:46:20.793393 
+2026-Jul-02 17:46:20.793393 #7 [api internal] load metadata for docker.io/library/alpine:3.20
+2026-Jul-02 17:46:20.793393 #7 DONE 0.7s
+2026-Jul-02 17:46:20.793393 
+2026-Jul-02 17:46:20.793393 #8 [api internal] load .dockerignore
+2026-Jul-02 17:46:20.793393 #8 transferring context: 121B done
+2026-Jul-02 17:46:20.793393 #8 DONE 0.0s
+2026-Jul-02 17:46:20.795522 #9 [api internal] load build context
+2026-Jul-02 17:46:20.795522 #9 DONE 0.0s
+2026-Jul-02 17:46:20.795522 
+2026-Jul-02 17:46:20.795522 #10 [api builder 1/6] FROM docker.io/library/golang:1.25-alpine@sha256:523c3effe300580ed375e43f43b1c9b091b68e935a7c3a92bfcc4e7ed55b18c2
+2026-Jul-02 17:46:20.795522 #10 resolve docker.io/library/golang:1.25-alpine@sha256:523c3effe300580ed375e43f43b1c9b091b68e935a7c3a92bfcc4e7ed55b18c2 0.0s done
+2026-Jul-02 17:46:20.795522 #10 DONE 0.0s
+2026-Jul-02 17:46:20.795522 
+2026-Jul-02 17:46:20.795522 #11 [api stage-1 1/4] FROM docker.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+2026-Jul-02 17:46:20.795522 #11 resolve docker.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+2026-Jul-02 17:46:20.901018 #11 resolve docker.io/library/alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc 0.0s done
+2026-Jul-02 17:46:20.901018 #11 DONE 0.0s
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #9 [api internal] load build context
+2026-Jul-02 17:46:20.901018 #9 transferring context: 151.56kB done
+2026-Jul-02 17:46:20.901018 #9 DONE 0.0s
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #4 [web internal] load metadata for docker.io/oven/bun:1-alpine
+2026-Jul-02 17:46:20.901018 #4 DONE 0.7s
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #12 [api builder 6/6] RUN CGO_ENABLED=0 GOOS=linux go build     -ldflags="-s -w -X main.buildTime=$(date -u +%Y%m%d-%H%M%S)"     -o /out/api ./cmd/server
+2026-Jul-02 17:46:20.901018 #12 CACHED
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #13 [api builder 4/6] RUN go mod download
+2026-Jul-02 17:46:20.901018 #13 CACHED
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #14 [api builder 2/6] WORKDIR /build
+2026-Jul-02 17:46:20.901018 #14 CACHED
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #15 [api builder 3/6] COPY go.mod go.sum ./
+2026-Jul-02 17:46:20.901018 #15 CACHED
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #16 [api stage-1 2/4] RUN apk add --no-cache ca-certificates tzdata curl &&     adduser -D -u 10001 app
+2026-Jul-02 17:46:20.901018 #16 CACHED
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #17 [api builder 5/6] COPY . .
+2026-Jul-02 17:46:20.901018 #17 CACHED
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #18 [api stage-1 3/4] WORKDIR /app
+2026-Jul-02 17:46:20.901018 #18 CACHED
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #19 [api stage-1 4/4] COPY --from=builder /out/api /app/api
+2026-Jul-02 17:46:20.901018 #19 CACHED
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #20 [web internal] load .dockerignore
+2026-Jul-02 17:46:20.901018 #20 transferring context: 124B done
+2026-Jul-02 17:46:20.901018 #20 DONE 0.0s
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #21 [web builder 1/6] FROM docker.io/oven/bun:1-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0
+2026-Jul-02 17:46:20.901018 #21 resolve docker.io/oven/bun:1-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 0.0s done
+2026-Jul-02 17:46:20.901018 #21 DONE 0.0s
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #22 [web stage-1 1/4] FROM docker.io/library/nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+2026-Jul-02 17:46:20.901018 #22 resolve docker.io/library/nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 0.0s done
+2026-Jul-02 17:46:20.901018 #22 DONE 0.0s
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #23 [api] exporting to image
+2026-Jul-02 17:46:20.901018 #23 exporting layers done
+2026-Jul-02 17:46:20.901018 #23 exporting manifest sha256:ad8313023005d2fcf2861805505a0a493c9c021327f26f2ba0e5028bd1c3759d done
+2026-Jul-02 17:46:20.901018 #23 exporting config sha256:93212ddbe862bb6305831fedd9e4c8fbdaee768b85e5fb3a2b1615e9f9292b67 done
+2026-Jul-02 17:46:20.901018 #23 exporting attestation manifest sha256:954aca5b8d664ec8f9a3c9df4764bc6611070093aefeec28f1328a4941104197 done
+2026-Jul-02 17:46:20.901018 #23 exporting manifest list sha256:8a47ecacad7bbee364a199b40b2b541deb77820193849cf6c2d35e60c540964a done
+2026-Jul-02 17:46:20.901018 #23 naming to docker.io/library/xw48gss8ossc0wk4cgg8sw8k_api:73fdf0966cc37bdb7e55f3eeb1414572621d3111 done
+2026-Jul-02 17:46:20.901018 #23 unpacking to docker.io/library/xw48gss8ossc0wk4cgg8sw8k_api:73fdf0966cc37bdb7e55f3eeb1414572621d3111 done
+2026-Jul-02 17:46:20.901018 #23 DONE 0.1s
+2026-Jul-02 17:46:20.901018 
+2026-Jul-02 17:46:20.901018 #24 [web internal] load build context
+2026-Jul-02 17:46:20.901018 #24 transferring context: 433.57kB 0.0s done
+2026-Jul-02 17:46:20.901018 #24 DONE 0.0s
+2026-Jul-02 17:46:21.006828 #25 [web stage-1 2/4] RUN rm /etc/nginx/conf.d/default.conf
+2026-Jul-02 17:46:21.006828 #25 CACHED
+2026-Jul-02 17:46:21.006828 
+2026-Jul-02 17:46:21.006828 #26 [web builder 6/6] RUN bun run build
+2026-Jul-02 17:46:21.006828 #26 CACHED
+2026-Jul-02 17:46:21.006828 
+2026-Jul-02 17:46:21.006828 #27 [web builder 2/6] WORKDIR /build
+2026-Jul-02 17:46:21.006828 #27 CACHED
+2026-Jul-02 17:46:21.006828 
+2026-Jul-02 17:46:21.006828 #28 [web builder 5/6] COPY . .
+2026-Jul-02 17:46:21.006828 #28 CACHED
+2026-Jul-02 17:46:21.006828 
+2026-Jul-02 17:46:21.006828 #29 [web stage-1 3/4] COPY nginx.conf /etc/nginx/conf.d/default.conf
+2026-Jul-02 17:46:21.006828 #29 CACHED
+2026-Jul-02 17:46:21.006828 
+2026-Jul-02 17:46:21.006828 #30 [web builder 3/6] COPY package.json bun.lock ./
+2026-Jul-02 17:46:21.006828 #30 CACHED
+2026-Jul-02 17:46:21.006828 
+2026-Jul-02 17:46:21.006828 #31 [web builder 4/6] RUN bun install --frozen-lockfile
+2026-Jul-02 17:46:21.006828 #31 CACHED
+2026-Jul-02 17:46:21.006828 
+2026-Jul-02 17:46:21.006828 #32 [web stage-1 4/4] COPY --from=builder /build/dist /usr/share/nginx/html
+2026-Jul-02 17:46:21.006828 #32 CACHED
+2026-Jul-02 17:46:21.006828 
+2026-Jul-02 17:46:21.006828 #33 [api] resolving provenance for metadata file
+2026-Jul-02 17:46:21.006828 #33 DONE 0.0s
+2026-Jul-02 17:46:21.006828 
+2026-Jul-02 17:46:21.006828 #34 [web] exporting to image
+2026-Jul-02 17:46:21.006828 #34 exporting layers done
+2026-Jul-02 17:46:21.006828 #34 exporting manifest sha256:ca5f6abe7a2bb1317bd5ee558a33c8f5c2cd09949a9d05440c0f795ac0ec33ff 0.0s done
+2026-Jul-02 17:46:21.006828 #34 exporting config sha256:cd48a8e829a3ead318325f58951fd6c5a0ed50221b0e22f39589ec718fd4a8cc done
+2026-Jul-02 17:46:21.006828 #34 exporting attestation manifest sha256:09e9ab5abb42452776842d68df9f2cce6178488863e6e366811184c9f2603656 done
+2026-Jul-02 17:46:21.006828 #34 exporting manifest list sha256:be676cea216ed6d92e0709d57a479f3b545ec46117bb900d7707b01b97b16517 done
+2026-Jul-02 17:46:21.006828 #34 naming to docker.io/library/xw48gss8ossc0wk4cgg8sw8k_web:73fdf0966cc37bdb7e55f3eeb1414572621d3111 done
+2026-Jul-02 17:46:21.006828 #34 unpacking to docker.io/library/xw48gss8ossc0wk4cgg8sw8k_web:73fdf0966cc37bdb7e55f3eeb1414572621d3111 0.0s done
+2026-Jul-02 17:46:21.006828 #34 DONE 0.1s
+2026-Jul-02 17:46:21.115513 #35 [web] resolving provenance for metadata file
+2026-Jul-02 17:46:21.115513 #35 DONE 0.0s
+2026-Jul-02 17:46:21.119024 web  Built
+2026-Jul-02 17:46:21.119024 api  Built
+2026-Jul-02 17:46:21.182354 Creating .env file with runtime variables for container.
+2026-Jul-02 17:46:22.198084 Removing old containers.
+2026-Jul-02 17:46:23.224245 [CMD]: docker stop -t 30 web-xw48gss8ossc0wk4cgg8sw8k-174358739681
+2026-Jul-02 17:46:23.224245 web-xw48gss8ossc0wk4cgg8sw8k-174358739681
+2026-Jul-02 17:46:23.747550 [CMD]: docker rm -f web-xw48gss8ossc0wk4cgg8sw8k-174358739681
+2026-Jul-02 17:46:23.747550 web-xw48gss8ossc0wk4cgg8sw8k-174358739681
+2026-Jul-02 17:46:24.222701 [CMD]: docker stop -t 30 martin-xw48gss8ossc0wk4cgg8sw8k-174358708153
+2026-Jul-02 17:46:24.222701 martin-xw48gss8ossc0wk4cgg8sw8k-174358708153
+2026-Jul-02 17:46:24.695426 [CMD]: docker rm -f martin-xw48gss8ossc0wk4cgg8sw8k-174358708153
+2026-Jul-02 17:46:24.695426 martin-xw48gss8ossc0wk4cgg8sw8k-174358708153
+2026-Jul-02 17:46:25.145015 [CMD]: docker stop -t 30 api-xw48gss8ossc0wk4cgg8sw8k-174358719583
+2026-Jul-02 17:46:25.145015 api-xw48gss8ossc0wk4cgg8sw8k-174358719583
+2026-Jul-02 17:46:25.649714 [CMD]: docker rm -f api-xw48gss8ossc0wk4cgg8sw8k-174358719583
+2026-Jul-02 17:46:25.649714 api-xw48gss8ossc0wk4cgg8sw8k-174358719583
+2026-Jul-02 17:46:26.394981 [CMD]: docker stop -t 30 postgres-xw48gss8ossc0wk4cgg8sw8k-174358689778
+2026-Jul-02 17:46:26.394981 postgres-xw48gss8ossc0wk4cgg8sw8k-174358689778
+2026-Jul-02 17:46:26.893786 [CMD]: docker rm -f postgres-xw48gss8ossc0wk4cgg8sw8k-174358689778
+2026-Jul-02 17:46:26.893786 postgres-xw48gss8ossc0wk4cgg8sw8k-174358689778
+2026-Jul-02 17:46:26.902714 Starting new application.
+2026-Jul-02 17:46:30.721962 [CMD]: COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=xw48gss8ossc0wk4cgg8sw8k  docker compose --env-file /data/coolify/applications/xw48gss8ossc0wk4cgg8sw8k/.env --project-name xw48gss8ossc0wk4cgg8sw8k --project-directory /data/coolify/applications/xw48gss8ossc0wk4cgg8sw8k -f /data/coolify/applications/xw48gss8ossc0wk4cgg8sw8k/infra/docker-compose.prod.yaml up -d
+2026-Jul-02 17:46:30.721962 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Creating
+2026-Jul-02 17:46:30.773108 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Created
+2026-Jul-02 17:46:30.777347 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Creating
+2026-Jul-02 17:46:30.777347 Container martin-xw48gss8ossc0wk4cgg8sw8k-174614875945 Creating
+2026-Jul-02 17:46:30.808306 Container martin-xw48gss8ossc0wk4cgg8sw8k-174614875945 Created
+2026-Jul-02 17:46:30.808306 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Created
+2026-Jul-02 17:46:30.813036 Container web-xw48gss8ossc0wk4cgg8sw8k-174614915139 Creating
+2026-Jul-02 17:46:30.837922 Container web-xw48gss8ossc0wk4cgg8sw8k-174614915139 Created
+2026-Jul-02 17:46:30.854836 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Starting
+2026-Jul-02 17:46:31.065833 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Started
+2026-Jul-02 17:46:31.065833 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Waiting
+2026-Jul-02 17:46:31.065833 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Waiting
+2026-Jul-02 17:46:36.568046 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Healthy
+2026-Jul-02 17:46:36.568046 Container martin-xw48gss8ossc0wk4cgg8sw8k-174614875945 Starting
+2026-Jul-02 17:46:36.568046 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Healthy
+2026-Jul-02 17:46:36.568046 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Starting
+2026-Jul-02 17:46:36.786355 Container martin-xw48gss8ossc0wk4cgg8sw8k-174614875945 Started
+2026-Jul-02 17:46:36.800464 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Started
+2026-Jul-02 17:46:36.800464 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Waiting
+2026-Jul-02 17:46:38.054861 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Error dependency api failed to start
+2026-Jul-02 17:46:38.059162 dependency failed to start: container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 is unhealthy
+2026-Jul-02 17:46:38.108632 ========================================
+2026-Jul-02 17:46:38.115654 Deployment failed: Command execution failed (exit code 1): COOLIFY_BRANCH=main COOLIFY_RESOURCE_UUID=xw48gss8ossc0wk4cgg8sw8k  docker compose --env-file /data/coolify/applications/xw48gss8ossc0wk4cgg8sw8k/.env --project-name xw48gss8ossc0wk4cgg8sw8k --project-directory /data/coolify/applications/xw48gss8ossc0wk4cgg8sw8k -f /data/coolify/applications/xw48gss8ossc0wk4cgg8sw8k/infra/docker-compose.prod.yaml up -d
+2026-Jul-02 17:46:38.115654 Error:  Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Creating
+2026-Jul-02 17:46:38.115654 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Created
+2026-Jul-02 17:46:38.115654 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Creating
+2026-Jul-02 17:46:38.115654 Container martin-xw48gss8ossc0wk4cgg8sw8k-174614875945 Creating
+2026-Jul-02 17:46:38.115654 Container martin-xw48gss8ossc0wk4cgg8sw8k-174614875945 Created
+2026-Jul-02 17:46:38.115654 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Created
+2026-Jul-02 17:46:38.115654 Container web-xw48gss8ossc0wk4cgg8sw8k-174614915139 Creating
+2026-Jul-02 17:46:38.115654 Container web-xw48gss8ossc0wk4cgg8sw8k-174614915139 Created
+2026-Jul-02 17:46:38.115654 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Starting
+2026-Jul-02 17:46:38.115654 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Started
+2026-Jul-02 17:46:38.115654 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Waiting
+2026-Jul-02 17:46:38.115654 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Waiting
+2026-Jul-02 17:46:38.115654 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Healthy
+2026-Jul-02 17:46:38.115654 Container martin-xw48gss8ossc0wk4cgg8sw8k-174614875945 Starting
+2026-Jul-02 17:46:38.115654 Container postgres-xw48gss8ossc0wk4cgg8sw8k-174614855541 Healthy
+2026-Jul-02 17:46:38.115654 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Starting
+2026-Jul-02 17:46:38.115654 Container martin-xw48gss8ossc0wk4cgg8sw8k-174614875945 Started
+2026-Jul-02 17:46:38.115654 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Started
+2026-Jul-02 17:46:38.115654 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Waiting
+2026-Jul-02 17:46:38.115654 Container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 Error dependency api failed to start
+2026-Jul-02 17:46:38.115654 dependency failed to start: container api-xw48gss8ossc0wk4cgg8sw8k-174614890468 is unhealthy
+2026-Jul-02 17:46:38.125195 Error type: RuntimeException
+2026-Jul-02 17:46:38.136655 Error code: 0
+2026-Jul-02 17:46:38.143117 Location: /var/www/html/app/Traits/ExecuteRemoteCommand.php:243
+2026-Jul-02 17:46:38.150932 Stack trace (first 5 lines):
+2026-Jul-02 17:46:38.157337 #0 /var/www/html/app/Traits/ExecuteRemoteCommand.php(104): App\Jobs\ApplicationDeploymentJob->executeCommandWithProcess()
+2026-Jul-02 17:46:38.163326 #1 /var/www/html/vendor/laravel/framework/src/Illuminate/Collections/Traits/EnumeratesValues.php(271): App\Jobs\ApplicationDeploymentJob->{closure:App\Traits\ExecuteRemoteCommand::execute_remote_command():71}()
+2026-Jul-02 17:46:38.169143 #2 /var/www/html/app/Traits/ExecuteRemoteCommand.php(71): Illuminate\Support\Collection->each()
+2026-Jul-02 17:46:38.175672 #3 /var/www/html/app/Jobs/ApplicationDeploymentJob.php(809): App\Jobs\ApplicationDeploymentJob->execute_remote_command()
+2026-Jul-02 17:46:38.182222 #4 /var/www/html/app/Jobs/ApplicationDeploymentJob.php(467): App\Jobs\ApplicationDeploymentJob->deploy_docker_compose_buildpack()
+2026-Jul-02 17:46:38.189869 ========================================
+2026-Jul-02 17:46:40.156455 Gracefully shutting down build container: wk8cg8gocws4c48gk4sokw08
+2026-Jul-02 17:46:40.673514 [CMD]: docker stop -t 30 wk8cg8gocws4c48gk4sokw08
+2026-Jul-02 17:46:40.673514 wk8cg8gocws4c48gk4sokw08
