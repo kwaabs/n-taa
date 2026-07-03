@@ -8,7 +8,13 @@ import { applyLayerStyle } from "./layerStyle";
 import { sortByPriority, layerPriority } from "./layerOrder";
 import type { Layer } from "@/features/layers/types";
 
-const STYLE_SUFFIXES = ["__circle", "__line", "__fill", "__outline"] as const;
+const STYLE_SUFFIXES = [
+  "__circle",
+  "__line",
+  "__fill",
+  "__outline",
+  "__centroid",
+] as const;
 
 // A dummy top-of-stack layer. Every data layer is inserted BELOW it.
 // Overlays (selection highlight, query, measure) are added AFTER data

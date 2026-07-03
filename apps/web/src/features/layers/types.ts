@@ -1,12 +1,12 @@
 export type PointStyle = {
   icon?: string;
   size?: number;
-  color?: string;
+  color?: string | (string | number | unknown[])[];
   halo_color?: string;
   halo_width?: number;
   opacity?: number;
   minzoom?: number;
-  render_as?: "symbol" | "circle"; // ← ADD
+  render_as?: "symbol" | "circle";
 };
 
 export type LineStyle = {
@@ -16,11 +16,22 @@ export type LineStyle = {
   dash?: number[];
 };
 
+export type PolygonCentroidStyle = {
+  enabled?: boolean;
+  switch_zoom?: number;
+  icon?: string;
+  size?: number;
+  color?: string;
+  halo_color?: string;
+  halo_width?: number;
+};
+
 export type PolygonStyle = {
   fill_color?: string;
   fill_opacity?: number;
   outline_color?: string;
   outline_width?: number;
+  centroid?: PolygonCentroidStyle;
 };
 
 export interface LayerStyle {

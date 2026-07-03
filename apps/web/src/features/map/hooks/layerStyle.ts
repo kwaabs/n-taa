@@ -124,25 +124,30 @@ export function applyLayerStyle(
   });
 
   // ─── Polygon fill ─────────────────────────────────
+  // ─── Polygon fill (zoom-scoped when centroid mode is on) ──
+  const hasCentroid = poly.centroid?.enabled === true;
+  const switchZoom = poly.centroid?.switch_zoom ?? 12;
+
   map.addLayer({
     id: `${sourceId}__fill`,
     type: "fill",
     source: sourceId,
     "source-layer": sourceLayer,
     filter: ["==", ["geometry-type"], "Polygon"],
+    minzoom: hasCentroid ? switchZoom : 0,
     paint: {
       "fill-color": poly.fill_color,
       "fill-opacity": poly.fill_opacity,
     },
   });
 
-  // ─── Polygon outline (real line so width scales properly) ──
   map.addLayer({
     id: `${sourceId}__outline`,
     type: "line",
     source: sourceId,
     "source-layer": sourceLayer,
     filter: ["==", ["geometry-type"], "Polygon"],
+    minzoom: hasCentroid ? switchZoom : 0,
     paint: {
       "line-color": poly.outline_color,
       "line-width": [
@@ -160,4 +165,30 @@ export function applyLayerStyle(
     },
     layout: { "line-cap": "round", "line-join": "round" },
   });
+
+  // ─── Polygon centroid (only when centroid mode is on) ──
+  // MapLibre auto-places symbols at polygon centroids.
+  if (hasCentroid) {
+    const c = poly.centroid!;
+    map.addLayer({
+      id: `${sourceId}__centroid`,
+      type: "symbol",
+      source: sourceId,
+      "source-layer": sourceLayer,
+      filter: ["==", ["geometry-type"], "Polygon"],
+      maxzoom: switchZoom,
+      layout: {
+        "icon-image": c.icon ?? "dot",
+        "icon-size": c.size ?? 0.4,
+        "icon-allow-overlap": true,
+        "icon-ignore-placement": true,
+        "symbol-placement": "point",
+      },
+      paint: {
+        "icon-color": (c.color ?? "#78350f") as never,
+        "icon-halo-color": c.halo_color ?? "#ffffff",
+        "icon-halo-width": c.halo_width ?? 1,
+      },
+    });
+  }
 }
