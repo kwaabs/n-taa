@@ -150,7 +150,17 @@ export async function downloadFile(
   }
 
   if (!res.ok) {
-    throw new Error(`download failed: ${res.status}`);
+    // Try to read the JSON error message
+    let message = `download failed: ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.error?.message) {
+        message = body.error.message;
+      }
+    } catch {
+      // Not JSON, keep generic message
+    }
+    throw new Error(message);
   }
 
   const disposition = res.headers.get("Content-Disposition") ?? "";

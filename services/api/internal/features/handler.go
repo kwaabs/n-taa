@@ -14,16 +14,24 @@ import (
     "github.com/go-chi/chi/v5"
     "github.com/google/uuid"
 
+    "github.com/kwaabs/ntaa/services/api/internal/auth"
+    "github.com/kwaabs/ntaa/services/api/internal/layers"
+
     "github.com/kwaabs/ntaa/services/api/internal/httpx"
 )
 
 type Handler struct {
-    svc    *Service
-    logger *slog.Logger
+    svc           *Service
+    layersService *layers.Service   // ← ADD
+    logger        *slog.Logger
 }
 
-func NewHandler(svc *Service, logger *slog.Logger) *Handler {
-    return &Handler{svc: svc, logger: logger}
+func NewHandler(svc *Service, layersService *layers.Service, logger *slog.Logger) *Handler {
+    return &Handler{
+        svc:           svc,
+        layersService: layersService,
+        logger:        logger,
+    }
 }
 
 type featureRequest struct {
@@ -361,6 +369,21 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
     if !ok {
         return
     }
+
+
+    // Check export permission (superuser bypasses)
+        role, _ := auth.RoleFromContext(r.Context())
+        layer, err := h.layersService.Get(r.Context(), layerID)
+        if err != nil {
+            httpx.NotFound(w, "layer not found")
+            return
+        }
+        if !layer.CanExport(string(role)) {
+            httpx.Forbidden(w, "you don't have export access to this layer")
+            return
+        }
+
+
     fmtParam := strings.ToLower(chi.URLParam(r, "fmt"))
     var req exportRequest
     if err := httpx.DecodeJSON(r, &req); err != nil {
@@ -419,13 +442,22 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/layers/{layerId}/export.{fmt}
 // Whole-layer export — reuses Export() but injects world bounds if none supplied.
 func (h *Handler) ExportLayer(w http.ResponseWriter, r *http.Request) {
-    if _, ok := parseLayerID(w, r); !ok {
+    layerID, ok := parseLayerID(w, r)
+    if !ok {
         return
     }
 
-    // TODO: enforce layer export permission once features handler
-    // has a reference to layers.Service. View filtering already happens
-    // via the layers list endpoint.
+    // Check export permission (superuser bypasses)
+    role, _ := auth.RoleFromContext(r.Context())
+    layer, err := h.layersService.Get(r.Context(), layerID)
+    if err != nil {
+        httpx.NotFound(w, "layer not found")
+        return
+    }
+    if !layer.CanExport(string(role)) {
+        httpx.Forbidden(w, "you don't have export access to this layer")
+        return
+    }
 
     // Read the body; if empty or no `within`, inject world bounds.
     var req exportRequest
@@ -436,8 +468,6 @@ func (h *Handler) ExportLayer(w http.ResponseWriter, r *http.Request) {
         )
     }
 
-    // Re-serialize and hand off to the standard Export handler by
-    // replacing the body. Route param {fmt} is already set by chi.
     body, err := json.Marshal(req)
     if err != nil {
         httpx.Internal(w, h.logger, err)

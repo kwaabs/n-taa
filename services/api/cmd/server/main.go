@@ -76,7 +76,7 @@ func run() error {
     // Features wiring
     featuresRepo := features.NewRepo(database)
     featuresSvc := features.NewService(layersSvc, featuresRepo)
-    featuresHandler := features.NewHandler(featuresSvc, logger)
+    featuresHandler := features.NewHandler(featuresSvc, layersSvc, logger)
 
     srv := server.New(&server.Deps{
         Config:          cfg,
