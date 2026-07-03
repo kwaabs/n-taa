@@ -28,7 +28,6 @@ services:
       APP_DB_PASSWORD: ${APP_DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/bootstrap.sql:/docker-entrypoint-initdb.d/01-bootstrap.sql:ro
     networks:
       - app_net
     healthcheck:
