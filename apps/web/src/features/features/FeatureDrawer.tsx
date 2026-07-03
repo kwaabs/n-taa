@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   X,
   Loader2,
@@ -42,6 +42,17 @@ function isAuditField(key: string): boolean {
   );
 }
 
+function isGnssField(key: string): boolean {
+  return key.toLowerCase().startsWith("esrignss");
+}
+
+function isConditionField(key: string): boolean {
+  const k = key.toLowerCase();
+  return (
+    k.startsWith("cv_") || k.startsWith("ct_") || k === "condition_comments"
+  );
+}
+
 function formatValue(v: unknown): string {
   if (v === null || v === undefined) return "—";
   if (typeof v === "boolean") return v ? "Yes" : "No";
@@ -59,13 +70,6 @@ function humanKey(k: string): string {
 function isPolygon(feature: Feature | undefined): boolean {
   const t = feature?.geometry?.type;
   return t === "Polygon" || t === "MultiPolygon";
-}
-
-function isConditionField(key: string): boolean {
-  const k = key.toLowerCase();
-  return (
-    k.startsWith("cv_") || k.startsWith("ct_") || k === "condition_comments"
-  );
 }
 
 // ─── main drawer ─────────────────────────────────────────
@@ -89,7 +93,7 @@ export function FeatureDrawer() {
 
   const [tab, setTab] = useState<DrawerTab>("attributes");
 
-  // ── Derived data (must run every render — BEFORE any early return)
+  // Must run every render before any early return.
   const feature = local ? local.feature : apiFeature;
 
   const currentLayer = useMemo(() => {
@@ -97,23 +101,54 @@ export function FeatureDrawer() {
     return allLayers.find((l) => l.id === selection.layerId) ?? null;
   }, [allLayers, selection]);
 
+  const { attrEntries, conditionEntries, auditEntries, gnssEntries } =
+    useMemo(() => {
+      if (!feature) {
+        return {
+          attrEntries: [] as [string, unknown][],
+          conditionEntries: [] as [string, unknown][],
+          auditEntries: [] as [string, unknown][],
+          gnssEntries: [] as [string, unknown][],
+        };
+      }
+
+      const attrEntries: [string, unknown][] = [];
+      const conditionEntries: [string, unknown][] = [];
+      const auditEntries: [string, unknown][] = [];
+      const gnssEntries: [string, unknown][] = [];
+
+      for (const [k, v] of Object.entries(feature.properties)) {
+        if (isConditionField(k)) conditionEntries.push([k, v]);
+        else if (isAuditField(k)) auditEntries.push([k, v]);
+        else if (isGnssField(k)) gnssEntries.push([k, v]);
+        else attrEntries.push([k, v]);
+      }
+
+      return { attrEntries, conditionEntries, auditEntries, gnssEntries };
+    }, [feature]);
+
   const canTrace = !local && !!selection && isTraceable(currentLayer?.name);
+  const hasConditionData = conditionEntries.length > 0;
+  const showTabs = !local && (hasConditionData || canTrace);
 
-  const { attrEntries, conditionEntries, auditEntries } = useMemo(() => {
-    if (!feature)
-      return { attrEntries: [], conditionEntries: [], auditEntries: [] };
-    const attrEntries: [string, unknown][] = [];
-    const conditionEntries: [string, unknown][] = [];
-    const auditEntries: [string, unknown][] = [];
-    for (const [k, v] of Object.entries(feature.properties)) {
-      if (isConditionField(k)) conditionEntries.push([k, v]);
-      else if (isAuditField(k)) auditEntries.push([k, v]);
-      else attrEntries.push([k, v]);
+  // When selected feature changes, always reset to Attributes and clear old trace.
+  useEffect(() => {
+    setTab("attributes");
+    useTraceStore.getState().clear();
+  }, [selection?.layerId, selection?.ogcFid, local?.feature?.id]);
+
+  // Safety: if current tab is no longer valid, force back to Attributes.
+  useEffect(() => {
+    if (tab === "trace" && !canTrace) {
+      setTab("attributes");
     }
-    return { attrEntries, conditionEntries, auditEntries };
-  }, [feature]);
 
-  // ── Safe to early-return
+    if (tab === "condition" && conditionEntries.length === 0) {
+      setTab("attributes");
+    }
+  }, [tab, canTrace, conditionEntries.length]);
+
+  // Safe early return — all hooks above have already run.
   if (!selection && !local) return null;
 
   const layerName = local ? local.layerName : selection?.layerName;
@@ -126,9 +161,6 @@ export function FeatureDrawer() {
     setTab("attributes");
   };
 
-  const hasConditionData = conditionEntries.length > 0;
-  const showTabs = !local && (hasConditionData || canTrace);
-
   return (
     <aside className="absolute right-0 top-0 z-20 flex h-full w-96 flex-col border-l border-slate-200 bg-white shadow-xl">
       <header className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
@@ -138,6 +170,7 @@ export function FeatureDrawer() {
           </div>
           <div className="truncate font-semibold text-slate-800">{heading}</div>
         </div>
+
         <button
           onClick={onClose}
           className="rounded p-1.5 hover:bg-slate-100"
@@ -147,7 +180,6 @@ export function FeatureDrawer() {
         </button>
       </header>
 
-      {/* Tabs (only when there's more than one thing to show) */}
       {showTabs && (
         <div className="flex border-b border-slate-200 bg-slate-50">
           <TabButton
@@ -155,8 +187,11 @@ export function FeatureDrawer() {
             onClick={() => setTab("attributes")}
             icon={<Info className="h-3.5 w-3.5" />}
             label="Attributes"
-            count={attrEntries.length + auditEntries.length}
+            count={
+              attrEntries.length + auditEntries.length + gnssEntries.length
+            }
           />
+
           {hasConditionData && (
             <TabButton
               active={tab === "condition"}
@@ -166,6 +201,7 @@ export function FeatureDrawer() {
               count={conditionEntries.length}
             />
           )}
+
           {canTrace && (
             <TabButton
               active={tab === "trace"}
@@ -194,24 +230,27 @@ export function FeatureDrawer() {
 
         {feature && (
           <>
-            {/* Custom selection (draw / buffer) — no tab logic */}
+            {/* Custom selection / drawn area / buffer */}
             {local && (
               <ContentsPanel selectionLayerId="__local__" feature={feature} />
             )}
 
-            {/* Real feature — tabs */}
+            {/* Normal feature drawer */}
             {!local && selection && (
               <>
                 {tab === "attributes" && (
                   <AttributeList
                     entries={attrEntries}
                     auditEntries={auditEntries}
+                    gnssEntries={gnssEntries}
                   />
                 )}
-                {tab === "condition" && (
+
+                {tab === "condition" && hasConditionData && (
                   <ConditionList entries={conditionEntries} />
                 )}
-                {tab === "trace" && (
+
+                {tab === "trace" && canTrace && (
                   <TracePanel
                     layerId={selection.layerId}
                     ogcFid={selection.ogcFid}
@@ -220,7 +259,7 @@ export function FeatureDrawer() {
                   />
                 )}
 
-                {/* Contents panel for polygon features stays visible in Attributes tab only */}
+                {/* Polygon contents panel only belongs under Attributes */}
                 {tab === "attributes" && isPolygon(feature) && (
                   <div className="mt-6">
                     <ContentsPanel
@@ -238,16 +277,22 @@ export function FeatureDrawer() {
   );
 }
 
-// ─── list components ─────────────────────────────────────
+// ─── Attribute sections ─────────────────────────────────
 
 function AttributeList({
   entries,
   auditEntries,
+  gnssEntries,
 }: {
   entries: [string, unknown][];
   auditEntries: [string, unknown][];
+  gnssEntries: [string, unknown][];
 }) {
-  if (entries.length === 0 && auditEntries.length === 0) {
+  if (
+    entries.length === 0 &&
+    auditEntries.length === 0 &&
+    gnssEntries.length === 0
+  ) {
     return <p className="text-sm text-slate-500">No attributes to show.</p>;
   }
 
@@ -274,30 +319,62 @@ function AttributeList({
       {auditEntries.length > 0 && (
         <>
           <hr className="my-4 border-t border-slate-200" />
-          <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-            <History className="h-3 w-3" />
+          <SectionHeader icon={<History className="h-3 w-3" />}>
             Record history
-          </div>
-          <dl className="divide-y divide-slate-100 text-xs">
-            {auditEntries.map(([k, v]) => (
-              <div
-                key={k}
-                className="grid grid-cols-[minmax(0,140px)_minmax(0,1fr)] gap-3 py-1"
-              >
-                <dt className="truncate text-slate-400" title={k}>
-                  {humanKey(k)}
-                </dt>
-                <dd className="truncate text-slate-600" title={formatValue(v)}>
-                  {formatValue(v)}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          </SectionHeader>
+          <MetadataList entries={auditEntries} />
+        </>
+      )}
+
+      {gnssEntries.length > 0 && (
+        <>
+          <hr className="my-4 border-t border-slate-200" />
+          <SectionHeader icon={<Locate className="h-3 w-3" />}>
+            Location metadata
+          </SectionHeader>
+          <MetadataList entries={gnssEntries} />
         </>
       )}
     </div>
   );
 }
+
+function SectionHeader({
+  icon,
+  children,
+}: {
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+      {icon}
+      {children}
+    </div>
+  );
+}
+
+function MetadataList({ entries }: { entries: [string, unknown][] }) {
+  return (
+    <dl className="divide-y divide-slate-100 text-xs">
+      {entries.map(([k, v]) => (
+        <div
+          key={k}
+          className="grid grid-cols-[minmax(0,140px)_minmax(0,1fr)] gap-3 py-1"
+        >
+          <dt className="truncate text-slate-400" title={k}>
+            {humanKey(k)}
+          </dt>
+          <dd className="truncate text-slate-600" title={formatValue(v)}>
+            {formatValue(v)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+// ─── Condition assessment ───────────────────────────────
 
 function ConditionList({ entries }: { entries: [string, unknown][] }) {
   if (entries.length === 0) {
@@ -311,6 +388,7 @@ function ConditionList({ entries }: { entries: [string, unknown][] }) {
   const commentsIdx = entries.findIndex(
     ([k]) => k.toLowerCase() === "condition_comments",
   );
+
   const comments = commentsIdx >= 0 ? entries[commentsIdx][1] : null;
   const checks =
     commentsIdx >= 0 ? entries.filter((_, i) => i !== commentsIdx) : entries;
@@ -367,12 +445,14 @@ function ConditionValue({ value, field }: { value: unknown; field: string }) {
           </span>
         );
       }
+
       return (
         <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
           Flag {value > 1 ? `(${value})` : ""}
         </span>
       );
     }
+
     return <span className="text-slate-800">{value.toLocaleString()}</span>;
   }
 
@@ -383,7 +463,7 @@ function ConditionValue({ value, field }: { value: unknown; field: string }) {
   );
 }
 
-// ─── tab button ─────────────────────────────────────────
+// ─── Tabs ───────────────────────────────────────────────
 
 function TabButton({
   active,
@@ -408,6 +488,7 @@ function TabButton({
     >
       {icon}
       <span className="font-medium">{label}</span>
+
       {count > 0 && (
         <span
           className={[
@@ -420,6 +501,7 @@ function TabButton({
           {count}
         </span>
       )}
+
       {active && (
         <span className="absolute bottom-0 left-0 h-0.5 w-full bg-emerald-600" />
       )}
@@ -464,10 +546,12 @@ function ContentsPanel({
 
   const onShow = (layer: Layer, openTable: boolean) => {
     if (!feature.geometry) return;
+
     if (openTable) {
       showTable(layer, feature.geometry);
       return;
     }
+
     query.mutate(
       { layerId: layer.id, geometry: feature.geometry, limit: 5000 },
       {
@@ -489,6 +573,7 @@ function ContentsPanel({
         <Compass className="h-3.5 w-3.5" />
         Contents
       </div>
+
       <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
         {counts.map(({ layer, count, isLoading, isError }) => (
           <li
@@ -498,6 +583,7 @@ function ContentsPanel({
             <span className="flex-1 truncate text-slate-800">
               {layer.display_name}
             </span>
+
             <span className="min-w-[3ch] text-right font-mono text-slate-500">
               {isLoading
                 ? "…"
@@ -505,6 +591,7 @@ function ContentsPanel({
                   ? "?"
                   : (count?.toLocaleString() ?? "0")}
             </span>
+
             <button
               onClick={() => onShow(layer, false)}
               disabled={!count || query.isPending}
@@ -513,6 +600,7 @@ function ContentsPanel({
             >
               Show
             </button>
+
             <button
               onClick={() => onShow(layer, true)}
               disabled={!count || query.isPending}
@@ -550,6 +638,7 @@ function TracePanel({
   const [includeTransformers, setIncludeTransformers] = useState(false);
 
   const companionText = companionLabel(layerTableName);
+  const hasResult = !!traceStore.feederKey;
 
   const onTrace = () => {
     trace.mutate(
@@ -592,6 +681,7 @@ function TracePanel({
   const onZoom = () => {
     const map = getMap();
     if (!map || !traceStore.bounds) return;
+
     map.fitBounds(
       [
         [traceStore.bounds[0], traceStore.bounds[1]],
@@ -615,8 +705,6 @@ function TracePanel({
     trace.reset();
   };
 
-  const hasResult = !!traceStore.feederKey;
-
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
@@ -629,7 +717,6 @@ function TracePanel({
         </p>
       </div>
 
-      {/* Options */}
       {!hasResult && !trace.isPending && (
         <div className="space-y-2">
           {companionText && (
@@ -648,6 +735,7 @@ function TracePanel({
               </div>
             </label>
           )}
+
           <label className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-700 hover:bg-slate-50">
             <input
               type="checkbox"
@@ -697,18 +785,20 @@ function TracePanel({
             <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
               Feeder ID
             </div>
+
             <div className="mb-3 truncate text-sm font-semibold text-slate-800">
               {traceStore.feederKey}
             </div>
 
-            {/* Breakdown */}
             <div className="mb-3 space-y-1 text-xs">
               {traceStore.primary && (
                 <SegmentRow segment={traceStore.primary} />
               )}
+
               {traceStore.companions.map((c) => (
                 <SegmentRow key={c.tableName} segment={c} />
               ))}
+
               {traceStore.companions.length > 0 && (
                 <>
                   <div className="my-1 border-t border-slate-200" />
@@ -747,6 +837,7 @@ function TracePanel({
               <Locate className="h-3.5 w-3.5" />
               Zoom to feeder
             </button>
+
             <button
               onClick={onClear}
               className="flex items-center justify-center gap-1.5 rounded-md border border-cyan-200 bg-cyan-50 px-2 py-1.5 text-xs text-cyan-700 hover:bg-cyan-100"
@@ -763,41 +854,13 @@ function TracePanel({
 
 function SegmentRow({ segment }: { segment: FeederSegmentInfo }) {
   return (
-    <div className="flex items-baseline justify-between text-slate-700">
+    <div className="flex items-baseline justify-between gap-3 text-slate-700">
       <span className="truncate">{segment.layerName}</span>
-      <span className="font-mono text-slate-500">
+      <span className="shrink-0 font-mono text-slate-500">
         {formatLength(segment.lengthM)}
         {" · "}
         {segment.segmentCount.toLocaleString()} seg
       </span>
-    </div>
-  );
-}
-
-function StatRow({
-  label,
-  value,
-  muted,
-}: {
-  label: string;
-  value: string;
-  muted?: boolean;
-}) {
-  return (
-    <div className="grid grid-cols-[minmax(0,120px)_minmax(0,1fr)] gap-3 px-3 py-1.5">
-      <dt className={muted ? "text-xs text-slate-400" : "text-slate-500"}>
-        {label}
-      </dt>
-      <dd
-        className={
-          muted
-            ? "truncate text-xs text-slate-500"
-            : "truncate font-medium text-slate-800"
-        }
-        title={value}
-      >
-        {value}
-      </dd>
     </div>
   );
 }
