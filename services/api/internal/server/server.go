@@ -16,6 +16,9 @@ import (
     "github.com/kwaabs/ntaa/services/api/internal/layers"
     "github.com/kwaabs/ntaa/services/api/internal/features"
     "github.com/kwaabs/ntaa/services/api/internal/httpx"
+
+    "github.com/kwaabs/ntaa/services/api/internal/auth/azure"
+
 )
 
 // Deps is the set of dependencies routes need.
@@ -29,6 +32,9 @@ type Deps struct {
     AuthMW          *auth.Middleware
     LayersHandler   *layers.Handler
     FeaturesHandler *features.Handler
+
+    AzureAuthHandler *azure.Handler   // ← ADD THIS
+
 }
 
 
@@ -37,6 +43,7 @@ type Server struct {
     deps   *Deps
     router *chi.Mux
     http   *http.Server
+    AzureAuthHandler *azure.Handler
 }
 
 func New(deps *Deps) *Server {

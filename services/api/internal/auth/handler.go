@@ -7,6 +7,7 @@ import (
     "time"
 
     "github.com/kwaabs/ntaa/services/api/internal/httpx"
+
 )
 
 const refreshCookieName = "geo_refresh"
@@ -73,7 +74,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
         }
         return
     }
-    h.setRefreshCookie(w, res.RefreshToken, res.RefreshExpiresAt)
+    h.svc.WriteRefreshCookie(w, r, res.RefreshToken, res.RefreshExpiresAt)
     httpx.JSON(w, http.StatusOK, loginResponse{
         AccessToken: res.AccessToken,
         ExpiresAt:   res.AccessExpiresAt,
@@ -97,7 +98,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
         httpx.Internal(w, h.logger, err)
         return
     }
-    h.setRefreshCookie(w, res.RefreshToken, res.RefreshExpiresAt)
+    h.svc.WriteRefreshCookie(w, r, res.RefreshToken, res.RefreshExpiresAt)
     httpx.JSON(w, http.StatusOK, loginResponse{
         AccessToken: res.AccessToken,
         ExpiresAt:   res.AccessExpiresAt,

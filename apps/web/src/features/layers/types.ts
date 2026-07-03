@@ -14,6 +14,7 @@ export type LineStyle = {
   width?: number;
   opacity?: number;
   dash?: number[];
+  minzoom?: number;
 };
 
 export type PolygonCentroidStyle = {
@@ -40,6 +41,11 @@ export interface LayerStyle {
   polygon?: PolygonStyle;
 }
 
+export interface LayerPermissions {
+  view_roles: ("superuser" | "editor" | "viewer")[];
+  export_roles: ("superuser" | "editor" | "viewer")[];
+}
+
 export interface Layer {
   id: string;
   name: string;
@@ -53,4 +59,5 @@ export interface Layer {
   editable: boolean;
   style: LayerStyle;
   tile_url: string;
+  permissions: LayerPermissions;
 }

@@ -112,6 +112,11 @@ export async function bootRefresh(): Promise<string | null> {
  * POST to a path expecting a file response (e.g. CSV).
  * Handles the token refresh dance internally and triggers a browser download.
  */
+/**
+ * POST to a path expecting a file response.
+ * For large responses uses File System Access API to stream directly to disk.
+ * Falls back to blob-based download for smaller files or older browsers.
+ */
 export async function downloadFile(
   path: string,
   body: Json,
@@ -129,7 +134,6 @@ export async function downloadFile(
     credentials: "include",
   });
 
-  // If unauthorized, try one refresh + retry.
   if (res.status === 401) {
     const fresh = await bootRefresh();
     if (fresh) {
@@ -149,11 +153,49 @@ export async function downloadFile(
     throw new Error(`download failed: ${res.status}`);
   }
 
-  // Prefer server's filename if provided.
   const disposition = res.headers.get("Content-Disposition") ?? "";
   const match = /filename="?([^"]+)"?/i.exec(disposition);
   const filename = match?.[1] ?? suggestedFilename;
 
+  // Prefer File System Access API for large streaming downloads
+  // (Chrome/Edge/Opera; Firefox falls through to blob path)
+  const fsAccess = (
+    window as unknown as {
+      showSaveFilePicker?: (opts?: unknown) => Promise<{
+        createWritable: () => Promise<{
+          write: (chunk: unknown) => Promise<void>;
+          close: () => Promise<void>;
+        }>;
+      }>;
+    }
+  ).showSaveFilePicker;
+
+  if (fsAccess && res.body) {
+    try {
+      // Ask user where to save; streams directly to disk.
+      const handle = await fsAccess({
+        suggestedName: filename,
+      });
+      const writable = await handle.createWritable();
+
+      const reader = res.body.getReader();
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        await writable.write(value);
+      }
+      await writable.close();
+      return;
+    } catch (e) {
+      // User cancelled OR API failed — fall through to blob path
+      // (some browsers throw AbortError when cancelled)
+      if ((e as { name?: string })?.name === "AbortError") return;
+      console.warn("File System Access failed, falling back to blob", e);
+    }
+  }
+
+  // Fallback: buffer to blob (works for smaller files or Firefox)
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

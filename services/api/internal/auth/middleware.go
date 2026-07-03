@@ -5,6 +5,8 @@ import (
     "net/http"
     "strings"
 
+    "github.com/google/uuid"
+
     "github.com/kwaabs/ntaa/services/api/internal/httpx"
 )
 
@@ -19,6 +21,24 @@ func WithUser(ctx context.Context, u *User) context.Context {
 func UserFromContext(ctx context.Context) (*User, bool) {
     u, ok := ctx.Value(userCtxKey).(*User)
     return u, ok
+}
+
+// UserIDFromContext returns the current user's ID.
+func UserIDFromContext(ctx context.Context) (uuid.UUID, bool) {
+    u, ok := UserFromContext(ctx)
+    if !ok || u == nil {
+        return uuid.UUID{}, false
+    }
+    return u.ID, true
+}
+
+// RoleFromContext returns the current user's role.
+func RoleFromContext(ctx context.Context) (Role, bool) {
+    u, ok := UserFromContext(ctx)
+    if !ok || u == nil {
+        return "", false
+    }
+    return u.Role, true
 }
 
 type Middleware struct {

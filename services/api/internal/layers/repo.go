@@ -3,6 +3,9 @@ package layers
 import (
     "context"
     "database/sql"
+"fmt"
+    "encoding/json"
+
     "errors"
 
     "github.com/google/uuid"
@@ -43,6 +46,32 @@ func (r *Repo) Update(ctx context.Context, l *Layer) error {
         Returning("*").
         Exec(ctx)
     return err
+}
+
+// UpdatePermissions writes only the permissions column for a layer.
+func (r *Repo) UpdatePermissions(ctx context.Context, l *Layer) error {
+    fmt.Printf("[DEBUG] UpdatePermissions called for id=%s\n", l.ID)
+
+    permsJSON, err := json.Marshal(l.Permissions)
+    if err != nil {
+        fmt.Printf("[DEBUG] json marshal failed: %v\n", err)
+        return err
+    }
+
+    fmt.Printf("[DEBUG] about to run UPDATE with json=%s\n", string(permsJSON))
+
+    res, err := r.db.ExecContext(ctx,
+        `UPDATE app.layers SET permissions = ?::jsonb WHERE id = ?`,
+        string(permsJSON), l.ID,
+    )
+    if err != nil {
+        fmt.Printf("[DEBUG] ExecContext returned error: %v\n", err)
+        return err
+    }
+
+    rows, _ := res.RowsAffected()
+    fmt.Printf("[DEBUG] UPDATE finished, rows affected: %d\n", rows)
+    return nil
 }
 
 func (r *Repo) Delete(ctx context.Context, id uuid.UUID) error {

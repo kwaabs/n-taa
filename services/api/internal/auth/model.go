@@ -36,8 +36,15 @@ type User struct {
     DisplayName string    `bun:"display_name,notnull"`
     Role        Role      `bun:"role,notnull"`
     Status      string    `bun:"status,notnull"`
-    CreatedAt   time.Time `bun:"created_at,notnull,default:now()"`
-    UpdatedAt   time.Time `bun:"updated_at,notnull,default:now()"`
+
+    // NEW — Azure AD support
+    AuthSource    string     `bun:"auth_source,notnull,default:'local'"`
+    AzureObjectID *string    `bun:"azure_object_id"`
+    Pending       bool       `bun:"pending,notnull,default:false"`
+    LastLoginAt   *time.Time `bun:"last_login_at"`
+
+    CreatedAt time.Time `bun:"created_at,notnull,default:current_timestamp"`
+    UpdatedAt time.Time `bun:"updated_at,notnull,default:current_timestamp"`
 }
 
 type Identity struct {

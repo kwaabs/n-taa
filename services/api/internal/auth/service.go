@@ -7,6 +7,13 @@ import (
     "encoding/base64"
     "errors"
     "time"
+
+    "strings"
+
+    "github.com/google/uuid"
+
+    "net/http"
+
 )
 
 var (
@@ -19,11 +26,22 @@ type Service struct {
     repo       *Repo
     access     *TokenIssuer
     refreshTTL time.Duration
+
+    superuserEmail string
+
 }
 
-func NewService(repo *Repo, access *TokenIssuer, refreshTTL time.Duration) *Service {
-    return &Service{repo: repo, access: access, refreshTTL: refreshTTL}
+// After
+func NewService(repo *Repo, tokenIssuer *TokenIssuer, refreshTTL time.Duration, superuserEmail string) *Service {
+    return &Service{
+        repo:           repo,
+        access:         tokenIssuer,       // ← was tokenIssuer:, must be access:
+        refreshTTL:     refreshTTL,
+        superuserEmail: superuserEmail,
+    }
 }
+
+func (s *Service) SuperuserEmail() string { return s.superuserEmail }
 
 type LoginResult struct {
     AccessToken      string
@@ -55,7 +73,7 @@ func (s *Service) LoginLocal(ctx context.Context, email, password string) (*Logi
     if !VerifyPassword(*id.PasswordHash, password) {
         return nil, ErrInvalidCredentials
     }
-    return s.issue(ctx, u)
+    return s.Issue(ctx, u)
 }
 
 func (s *Service) Refresh(ctx context.Context, refresh string) (*LoginResult, error) {
@@ -76,7 +94,7 @@ func (s *Service) Refresh(ctx context.Context, refresh string) (*LoginResult, er
     if err := s.repo.RevokeRefresh(ctx, rt.ID); err != nil {
         return nil, err
     }
-    return s.issue(ctx, u)
+    return s.Issue(ctx, u)
 }
 
 func (s *Service) Logout(ctx context.Context, refresh string) error {
@@ -93,7 +111,7 @@ func (s *Service) Logout(ctx context.Context, refresh string) error {
     return s.repo.RevokeRefresh(ctx, rt.ID)
 }
 
-func (s *Service) issue(ctx context.Context, u *User) (*LoginResult, error) {
+func (s *Service) Issue(ctx context.Context, u *User) (*LoginResult, error) {
     access, accessExp, err := s.access.Issue(u.ID, u.Role)
     if err != nil {
         return nil, err
@@ -118,6 +136,112 @@ func (s *Service) issue(ctx context.Context, u *User) (*LoginResult, error) {
         RefreshExpiresAt: refreshExp,
         User:             u,
     }, nil
+}
+
+
+// WriteRefreshCookie sets the refresh cookie on the response.
+// Used by both LoginLocal handler and Azure OAuth handler.
+func (s *Service) WriteRefreshCookie(w http.ResponseWriter, r *http.Request, token string, expiresAt time.Time) {
+    http.SetCookie(w, &http.Cookie{
+        Name: refreshCookieName,   // or hard-code the same name used in handler.go
+        Value:    token,
+        Path:     "/",
+        HttpOnly: true,
+        SameSite: http.SameSiteLaxMode,
+        Secure:   isSecureRequest(r),
+        Expires:  expiresAt,
+    })
+}
+
+
+// ─── User management ─────────────────────────────────
+
+var (
+    ErrUserNotFound         = errors.New("user not found")
+    ErrCannotEditBreakGlass = errors.New("cannot edit break-glass account")
+    ErrInvalidRole          = errors.New("invalid role")
+    ErrInvalidStatus        = errors.New("invalid status")
+)
+
+var (
+    validRoles    = map[string]bool{"superuser": true, "editor": true, "viewer": true}
+    validStatuses = map[string]bool{"active": true, "inactive": true}
+)
+
+type UserListFilter struct {
+    Search     string
+    AuthSource string
+    Status     string
+    Role       string
+}
+
+func (s *Service) ListUsers(ctx context.Context, f UserListFilter, offset, limit int) ([]*User, int64, error) {
+    return s.repo.ListUsers(ctx, f, offset, limit)
+}
+
+func (s *Service) UpdateUser(ctx context.Context, id uuid.UUID, req UpdateUserRequest) (*User, error) {
+    u, err := s.repo.GetUserByID(ctx, id)
+    if err != nil {
+        return nil, ErrUserNotFound
+    }
+
+    // Break-glass account is env-managed, not editable via UI
+    if strings.EqualFold(strings.TrimSpace(u.Email), strings.TrimSpace(s.superuserEmail)) {
+        return nil, ErrCannotEditBreakGlass
+    }
+
+    if req.Role != nil {
+        if !validRoles[*req.Role] {
+            return nil, ErrInvalidRole
+        }
+
+        u.Role = Role(*req.Role)   // ← cast to Role
+    }
+    if req.Status != nil {
+        if !validStatuses[*req.Status] {
+            return nil, ErrInvalidStatus
+        }
+        u.Status = *req.Status
+    }
+    if req.DisplayName != nil {
+        u.DisplayName = strings.TrimSpace(*req.DisplayName)
+    }
+
+    if err := s.repo.UpdateUser(ctx, u); err != nil {
+        return nil, err
+    }
+    return u, nil
+}
+
+func (s *Service) ApproveUser(ctx context.Context, id uuid.UUID, role string) (*User, error) {
+    u, err := s.repo.GetUserByID(ctx, id)
+    if err != nil {
+        return nil, ErrUserNotFound
+    }
+    if role == "" {
+        role = "viewer"
+    }
+    if !validRoles[role] {
+        return nil, ErrInvalidRole
+    }
+
+    u.Pending = false
+    u.Role = Role(role)
+    u.Status = "active"
+
+    if err := s.repo.UpdateUser(ctx, u); err != nil {
+        return nil, err
+    }
+    return u, nil
+}
+
+
+
+func isSecureRequest(r *http.Request) bool {
+    if r.TLS != nil {
+        return true
+    }
+    return r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
 func generateOpaque(n int) (string, error) {

@@ -352,6 +352,8 @@ func (h *Handler) Schema(w http.ResponseWriter, r *http.Request) {
 
 
 
+
+
 // POST /api/v1/layers/{layerId}/features/export.{fmt}
 // fmt ∈ { csv, xlsx, geojson }
 func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
@@ -417,14 +419,16 @@ func (h *Handler) Export(w http.ResponseWriter, r *http.Request) {
 // POST /api/v1/layers/{layerId}/export.{fmt}
 // Whole-layer export — reuses Export() but injects world bounds if none supplied.
 func (h *Handler) ExportLayer(w http.ResponseWriter, r *http.Request) {
-    // Ensure layerId is a valid UUID (parseLayerID emits 400 if not)
     if _, ok := parseLayerID(w, r); !ok {
         return
     }
 
+    // TODO: enforce layer export permission once features handler
+    // has a reference to layers.Service. View filtering already happens
+    // via the layers list endpoint.
+
     // Read the body; if empty or no `within`, inject world bounds.
     var req exportRequest
-    // It's OK for body to be missing entirely for whole-layer.
     _ = httpx.DecodeJSON(r, &req)
     if len(req.Within) == 0 {
         req.Within = json.RawMessage(

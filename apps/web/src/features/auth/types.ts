@@ -10,3 +10,15 @@ export interface LoginResponse {
   expires_at: string;
   user: User;
 }
+
+export interface AzureCallbackResponse {
+  pending: boolean;
+  access_token?: string;
+  expires_at?: string;
+  user: {
+    id?: string;
+    email: string;
+    display_name: string;
+    role?: string;
+  };
+}

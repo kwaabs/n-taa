@@ -4,6 +4,9 @@ import { useAuthStore } from "./store";
 import { useLogout } from "./hooks";
 import type { User } from "./types";
 
+import { Settings } from "lucide-react";
+import { useAdminStore } from "@/features/admin/store";
+
 /**
  * Extracts up-to-two initials from a user's display name.
  * "Super Admin"     → "SA"
@@ -26,6 +29,9 @@ export function UserMenu() {
   const logout = useLogout();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+
+  const openAdmin = useAdminStore((s) => s.openModal);
+  const isSuperuser = user?.role === "superuser";
 
   useEffect(() => {
     if (!open) return;
@@ -93,6 +99,19 @@ export function UserMenu() {
           </div>
 
           <div className="py-1">
+            {isSuperuser && (
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  openAdmin("users");
+                }}
+                className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <Settings className="h-4 w-4 text-slate-500" />
+                Admin
+              </button>
+            )}
+
             <button
               onClick={() => {
                 setOpen(false);

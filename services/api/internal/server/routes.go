@@ -36,10 +36,28 @@ func (s *Server) mountRoutes() {
             r.Post("/refresh", s.deps.AuthHandler.Refresh)
             r.Post("/logout", s.deps.AuthHandler.Logout)
 
+            // Azure AD OAuth2 (only mounted if AZURE_* env vars are set)
+            if s.deps.AzureAuthHandler != nil {
+                r.Route("/azure", func(r chi.Router) {
+                    r.Get("/login", s.deps.AzureAuthHandler.LoginURL)
+                    r.Post("/callback", s.deps.AzureAuthHandler.Callback)
+                })
+            }
+
             r.Group(func(r chi.Router) {
                 r.Use(s.deps.AuthMW.RequireUser)
                 r.Get("/me", s.deps.AuthHandler.Me)
             })
+        })
+
+        // Users — superuser only
+        r.Route("/users", func(r chi.Router) {
+            r.Use(s.deps.AuthMW.RequireUser)
+            r.Use(s.deps.AuthMW.RequireRole(auth.RoleSuperuser))
+
+            r.Get("/", s.deps.AuthHandler.UsersList)
+            r.Patch("/{id}", s.deps.AuthHandler.UsersUpdate)
+            r.Patch("/{id}/approve", s.deps.AuthHandler.UsersApprove)
         })
 
         // Layers (auth required for all endpoints)
@@ -54,6 +72,16 @@ func (s *Server) mountRoutes() {
 
             // Whole-layer export (CSV / XLSX / GeoJSON)
             r.Post("/{layerId}/export.{fmt}", s.deps.FeaturesHandler.ExportLayer)
+
+
+            r.Group(func(r chi.Router) {
+                    r.Use(s.deps.AuthMW.RequireRole(auth.RoleSuperuser))
+                    r.Post("/", s.deps.LayersHandler.Create)
+                    r.Patch("/{id}", s.deps.LayersHandler.Update)
+                    r.Delete("/{id}", s.deps.LayersHandler.Delete)
+                    r.Patch("/{id}/permissions", s.deps.LayersHandler.UpdatePermissions)  // ← ADD
+                })
+
 
             r.Group(func(r chi.Router) {
                 r.Use(s.deps.AuthMW.RequireRole(auth.RoleSuperuser))
@@ -74,6 +102,7 @@ func (s *Server) mountRoutes() {
                 // Spatial export (CSV / XLSX / GeoJSON)
                 r.Post("/export.{fmt}", s.deps.FeaturesHandler.Export)
 
+                // Feeder trace (line features only)
                 r.Post("/{ogcFid}/trace", s.deps.FeaturesHandler.TraceFeeder)
 
                 r.Group(func(r chi.Router) {

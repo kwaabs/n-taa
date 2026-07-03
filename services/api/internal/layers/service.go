@@ -13,6 +13,7 @@ var (
     ErrInvalidInput    = errors.New("invalid input")
     ErrDuplicate       = errors.New("layer already exists")
     ErrPhysicalMissing = errors.New("physical table not found")
+    ErrForbidden = errors.New("layer access forbidden")
 )
 
 type RawTableProbe interface {
@@ -159,4 +160,51 @@ func (s *Service) Delete(ctx context.Context, id uuid.UUID) error {
         return ErrNotFound
     }
     return s.repo.Delete(ctx, id)
+}
+
+
+// ListForRole returns layers the given role can view.
+// Existing List() can call this internally.
+func (s *Service) ListForRole(ctx context.Context, role string) ([]Layer, error) {
+    all, err := s.repo.List(ctx)
+    if err != nil {
+        return nil, err
+    }
+    if role == "superuser" {
+        return all, nil
+    }
+    filtered := make([]Layer, 0, len(all))
+    for _, l := range all {
+        if l.CanView(role) {
+            filtered = append(filtered, l)
+        }
+    }
+    return filtered, nil
+}
+
+func (s *Service) GetForRole(ctx context.Context, id uuid.UUID, role string) (*Layer, error) {
+    l, err := s.repo.Get(ctx, id)
+    if err != nil {
+        return nil, err
+    }
+    if !l.CanView(role) {
+        return nil, ErrForbidden
+    }
+    return l, nil
+}
+
+func (s *Service) UpdatePermissions(
+    ctx context.Context,
+    id uuid.UUID,
+    perms LayerPermissions,
+) (*Layer, error) {
+    l, err := s.repo.Get(ctx, id)
+    if err != nil {
+        return nil, err
+    }
+    l.Permissions = perms
+    if err := s.repo.UpdatePermissions(ctx, l); err != nil {   // ← Update → UpdatePermissions
+        return nil, err
+    }
+    return l, nil
 }

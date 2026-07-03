@@ -13,6 +13,8 @@ import (
     "github.com/kwaabs/ntaa/services/api/internal/layers"
     "github.com/kwaabs/ntaa/services/api/internal/server"
     "github.com/kwaabs/ntaa/services/api/internal/features"
+    "github.com/kwaabs/ntaa/services/api/internal/auth/azure"
+
 )
 
 func main() {
@@ -60,8 +62,9 @@ func run() error {
         cfg.JWTAccessTTL,
         cfg.JWTIssuer,
     )
-    authSvc := auth.NewService(authRepo, accessIssuer, cfg.JWTRefreshTTL)
+    authSvc := auth.NewService(authRepo, accessIssuer, cfg.JWTRefreshTTL,os.Getenv("SUPERUSER_EMAIL"))
     authHandler := auth.NewHandler(authSvc, logger, cfg.CookieDomain, cfg.CookieSecure)
+    azureHandler := azure.NewHandler(database, authSvc, logger)
     authMW := auth.NewMiddleware(accessIssuer, authRepo)
 
     // Layers wiring
@@ -83,6 +86,9 @@ func run() error {
         AuthMW:          authMW,
         LayersHandler:   layersHandler,
         FeaturesHandler: featuresHandler,
+
+        AzureAuthHandler: azureHandler,   // ← ADD THIS
+
     })
     return srv.Start(ctx)
 }

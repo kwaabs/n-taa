@@ -1,6 +1,7 @@
 package layers
 
 import (
+    "context"
     "errors"
     "log/slog"
     "net/http"
@@ -8,6 +9,7 @@ import (
     "github.com/go-chi/chi/v5"
     "github.com/google/uuid"
 
+    "github.com/kwaabs/ntaa/services/api/internal/auth"
     "github.com/kwaabs/ntaa/services/api/internal/httpx"
 )
 
@@ -20,25 +22,29 @@ func NewHandler(svc *Service, logger *slog.Logger) *Handler {
     return &Handler{svc: svc, logger: logger}
 }
 
+// ─── DTOs ─────────────────────────────────────────────
+
 type layerDTO struct {
-    ID             string `json:"id"`
-    Name           string `json:"name"`
-    DisplayName    string `json:"display_name"`
-    SchemaName     string `json:"schema_name"`
-    TableName      string `json:"table_name"`
-    IDColumn       string `json:"id_column"`
-    GeometryColumn string `json:"geometry_column"`
-    GeometryType   string `json:"geometry_type"`
-    SRID           int    `json:"srid"`
-    Editable       bool   `json:"editable"`
-    Style          any    `json:"style"`
-    TileURL        string `json:"tile_url"`
+    ID             string           `json:"id"`
+    Name           string           `json:"name"`
+    DisplayName    string           `json:"display_name"`
+    SchemaName     string           `json:"schema_name"`
+    TableName      string           `json:"table_name"`
+    IDColumn       string           `json:"id_column"`
+    GeometryColumn string           `json:"geometry_column"`
+    GeometryType   string           `json:"geometry_type"`
+    SRID           int              `json:"srid"`
+    Editable       bool             `json:"editable"`
+    Style          any              `json:"style"`
+    TileURL        string           `json:"tile_url"`
+    Permissions    LayerPermissions `json:"permissions"`
 }
 
 func buildTileURL(schema, table string) string {
     return "http://localhost:5441/" + schema + "." + table + "/{z}/{x}/{y}"
 }
 
+// toDTO — single layer → DTO
 func toDTO(l *Layer) layerDTO {
     return layerDTO{
         ID:             l.ID.String(),
@@ -53,8 +59,39 @@ func toDTO(l *Layer) layerDTO {
         Editable:       l.Editable,
         Style:          l.Style,
         TileURL:        buildTileURL(l.SchemaName, l.TableName),
+        Permissions:    l.Permissions,
     }
 }
+
+// toDTOs — slice of layers → slice of DTOs
+func toDTOs(ls []Layer) []layerDTO {
+    out := make([]layerDTO, 0, len(ls))
+    for i := range ls {
+        out = append(out, toDTO(&ls[i]))
+    }
+    return out
+}
+
+// ─── Context helpers ──────────────────────────────────
+
+func roleFromContext(ctx context.Context) (string, bool) {
+    role, ok := auth.RoleFromContext(ctx)
+    if !ok {
+        return "", false
+    }
+    return string(role), true
+}
+
+func parseID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
+    id, err := uuid.Parse(chi.URLParam(r, "id"))
+    if err != nil {
+        httpx.BadRequest(w, "invalid layer id")
+        return uuid.UUID{}, false
+    }
+    return id, true
+}
+
+// ─── Request bodies ───────────────────────────────────
 
 type createRequest struct {
     Name           string `json:"name"`
@@ -75,29 +112,45 @@ type updateRequest struct {
     Style       any     `json:"style"`
 }
 
+type updatePermissionsRequest struct {
+    ViewRoles   []string `json:"view_roles"`
+    ExportRoles []string `json:"export_roles"`
+}
+
+// ─── Handlers ─────────────────────────────────────────
+
+// GET /api/v1/layers
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-    layers, err := h.svc.List(r.Context())
+    role, ok := roleFromContext(r.Context())
+    if !ok {
+        httpx.Unauthorized(w, "no user in context")
+        return
+    }
+
+    layers, err := h.svc.ListForRole(r.Context(), role)
     if err != nil {
         httpx.Internal(w, h.logger, err)
         return
     }
-    out := make([]layerDTO, 0, len(layers))
-    for i := range layers {
-        out = append(out, toDTO(&layers[i]))
-    }
-    httpx.JSON(w, http.StatusOK, out)
+    httpx.JSON(w, http.StatusOK, toDTOs(layers))
 }
 
+// GET /api/v1/layers/{id}
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-    id, err := uuid.Parse(chi.URLParam(r, "id"))
-    if err != nil {
-        httpx.BadRequest(w, "invalid layer id")
+    id, ok := parseID(w, r)
+    if !ok {
         return
     }
-    l, err := h.svc.Get(r.Context(), id)
+    role, ok := roleFromContext(r.Context())
+    if !ok {
+        httpx.Unauthorized(w, "no user in context")
+        return
+    }
+
+    l, err := h.svc.GetForRole(r.Context(), id, role)
     if err != nil {
-        if errors.Is(err, ErrNotFound) {
-            httpx.NotFound(w, "layer not found")
+        if errors.Is(err, ErrForbidden) {
+            httpx.Forbidden(w, "you don't have access to this layer")
             return
         }
         httpx.Internal(w, h.logger, err)
@@ -106,6 +159,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
     httpx.JSON(w, http.StatusOK, toDTO(l))
 }
 
+// POST /api/v1/layers
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
     var req createRequest
     if err := httpx.DecodeJSON(r, &req); err != nil {
@@ -144,6 +198,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
     httpx.JSON(w, http.StatusCreated, toDTO(l))
 }
 
+// PATCH /api/v1/layers/{id}
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
     id, err := uuid.Parse(chi.URLParam(r, "id"))
     if err != nil {
@@ -174,6 +229,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
     httpx.JSON(w, http.StatusOK, toDTO(l))
 }
 
+// DELETE /api/v1/layers/{id}
 func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
     id, err := uuid.Parse(chi.URLParam(r, "id"))
     if err != nil {
@@ -189,4 +245,42 @@ func (h *Handler) Delete(w http.ResponseWriter, r *http.Request) {
         return
     }
     w.WriteHeader(http.StatusNoContent)
+}
+
+// PATCH /api/v1/layers/{id}/permissions — superuser only
+func (h *Handler) UpdatePermissions(w http.ResponseWriter, r *http.Request) {
+    id, ok := parseID(w, r)
+    if !ok {
+        return
+    }
+
+    var req updatePermissionsRequest
+    if err := httpx.DecodeJSON(r, &req); err != nil {
+        httpx.BadRequest(w, "invalid JSON body")
+        return
+    }
+
+    validRoles := map[string]bool{"superuser": true, "editor": true, "viewer": true}
+    for _, role := range req.ViewRoles {
+        if !validRoles[role] {
+            httpx.BadRequest(w, "invalid view role: "+role)
+            return
+        }
+    }
+    for _, role := range req.ExportRoles {
+        if !validRoles[role] {
+            httpx.BadRequest(w, "invalid export role: "+role)
+            return
+        }
+    }
+
+    updated, err := h.svc.UpdatePermissions(r.Context(), id, LayerPermissions{
+        ViewRoles:   req.ViewRoles,
+        ExportRoles: req.ExportRoles,
+    })
+    if err != nil {
+        httpx.Internal(w, h.logger, err)
+        return
+    }
+    httpx.JSON(w, http.StatusOK, toDTO(updated))
 }

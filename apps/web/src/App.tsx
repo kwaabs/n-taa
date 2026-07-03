@@ -18,7 +18,25 @@ import { BufferMenu } from "@/features/spatial/BufferMenu";
 
 import { PrintModal } from "@/features/print/PrintModal";
 
+import { ToastContainer } from "@/features/notifications/ToastContainer";
+
+import { AdminModal } from "@/features/admin/AdminModal";
+
 function AuthGate() {
+  // Detect Azure OAuth callback at any URL — Microsoft redirects here after sign-in
+  // with ?code=...&state=... in the query string.
+  const search = new URLSearchParams(window.location.search);
+  const isAzureCallback = search.has("code") && search.has("state");
+
+  if (isAzureCallback) {
+    return (
+      <>
+        <AzureCallback />
+        <ToastContainer />
+      </>
+    );
+  }
+
   const status = useAuthStore((s) => s.status);
   const setUser = useAuthStore((s) => s.setUser);
   const setStatus = useAuthStore((s) => s.setStatus);
@@ -51,20 +69,26 @@ function AuthGate() {
   }
 
   if (status === "anonymous") {
-    return <LoginScreen />;
+    return (
+      <>
+        <LoginScreen />
+        <ToastContainer />
+      </>
+    );
   }
 
   return (
     <MapProvider>
       <AppShell>
         <MapCanvas />
-        <MapToolCluster />{" "}
-        {/* ← replaces MapDebugPanel, MeasureToolbar, SelectToolbar */}
+        <MapToolCluster />
         <FeatureDrawer />
         <ResultsTable />
         <BufferMenu />
         <PrintModal />
       </AppShell>
+      <AdminModal />
+      <ToastContainer />
     </MapProvider>
   );
 }

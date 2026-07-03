@@ -5,6 +5,12 @@ import { PrintPreview } from "./PrintPreview";
 import { exportPrintView } from "./exportMap";
 import { useSearchStore } from "@/features/search/store";
 
+import {
+  toastProgress,
+  toastCompleteProgress,
+  toastFailProgress,
+} from "@/features/notifications/store";
+
 export function PrintModal() {
   const open = usePrintStore((s) => s.open);
   const settings = usePrintStore((s) => s.settings);
@@ -19,13 +25,29 @@ export function PrintModal() {
   const onDownload = async () => {
     if (!surfaceRef.current) return;
     setExporting(true);
+
+    const toastId = toastProgress(
+      `Preparing ${settings.format.toUpperCase()}`,
+      settings.title || "Map export",
+    );
+
     try {
       await exportPrintView({
         printSurface: surfaceRef.current,
         settings,
       });
+      toastCompleteProgress(
+        toastId,
+        "Map exported",
+        `${settings.title || "Map"}.${settings.format}`,
+      );
     } catch (e) {
       console.error("export failed", e);
+      toastFailProgress(
+        toastId,
+        "Export failed",
+        (e as { message?: string })?.message ?? "Unknown error",
+      );
     } finally {
       setExporting(false);
     }

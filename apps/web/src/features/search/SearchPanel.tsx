@@ -7,6 +7,7 @@ import { useSearchStore, draftIsRunnable, freshDraft } from "./store";
 import { FilterGroup } from "./FilterGroup";
 import { hasAnyCondition } from "./types";
 import { useTableStore } from "@/features/spatial/tableStore";
+import { toastSuccess, toastError } from "@/features/notifications/store";
 
 export function SearchPanel() {
   const { data: allLayers = [] } = useLayers();
@@ -29,12 +30,10 @@ export function SearchPanel() {
   const results = useSearchStore((s) => s.results);
   const clearResults = useSearchStore((s) => s.clearResults);
 
-  const showTable = useTableStore((s) => s.show);
+  const showSearchTable = useTableStore((s) => s.showSearch);
   const closeTable = useTableStore((s) => s.close);
 
   const [selectedId, setSelectedId] = useState<string>("");
-
-  const showSearchTable = useTableStore((s) => s.showSearch);
 
   // Keep selection valid as visible layers change
   useEffect(() => {
@@ -49,6 +48,7 @@ export function SearchPanel() {
 
   const currentLayer =
     searchableLayers.find((l) => l.id === selectedId) ?? null;
+
   const {
     data: schema,
     isLoading: schemaLoading,
@@ -65,12 +65,26 @@ export function SearchPanel() {
 
   const onSearch = () => {
     if (!selectedId || !draftIsRunnable(draft)) return;
+
     runSearch.mutate(
       { layerId: selectedId, query: draft! },
       {
-        onSuccess: () => {
+        onSuccess: (result) => {
           const layer = searchableLayers.find((l) => l.id === selectedId);
-          if (layer) showSearchTable(layer);
+          if (layer) {
+            showSearchTable(layer);
+          }
+          const total = result.total_count ?? result.features.length;
+          toastSuccess(
+            "Search complete",
+            `${total.toLocaleString()} matching in ${layer?.display_name ?? "layer"}`,
+          );
+        },
+        onError: (err) => {
+          toastError(
+            "Search failed",
+            (err as { message?: string })?.message ?? "Unknown error",
+          );
         },
       },
     );
@@ -80,14 +94,6 @@ export function SearchPanel() {
     clearResults();
     closeTable();
   };
-
-  if (searchableLayers.length === 0) {
-    return (
-      <div className="p-4 text-center text-xs text-slate-500">
-        Turn on at least one layer in <strong>Layers</strong> to search it.
-      </div>
-    );
-  }
 
   return (
     <div className="flex h-full flex-col">

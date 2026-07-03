@@ -115,7 +115,7 @@ export function applyLayerStyle(
     source: sourceId,
     "source-layer": sourceLayer,
     filter: ["==", ["geometry-type"], "LineString"],
-    minzoom: 6,
+    minzoom: l.minzoom ?? 6, // ← reads from style
     paint: linePaint,
     layout: {
       "line-cap": "round",

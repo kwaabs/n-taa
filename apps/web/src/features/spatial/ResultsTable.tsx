@@ -265,7 +265,7 @@ export function ResultsTable() {
         <div className="flex items-center gap-1">
           <ExportButton
             endpoint={`/api/v1/layers/${layer.id}/features/export`}
-            body={
+            extraBody={
               mode === "search"
                 ? {
                     within: {

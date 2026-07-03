@@ -19,6 +19,7 @@ import type { SidebarItem } from "./types";
 const ITEMS: SidebarItem[] = [
   { id: "layers", label: "Layers", icon: Layers },
   { id: "search", label: "Search", icon: Search },
+
   // { id: "tools",    label: "Tools",    icon: Wrench   },   // TODO: enable when ready
   // { id: "settings", label: "Settings", icon: Settings },   // TODO: enable when ready
 ];
@@ -144,10 +145,9 @@ function LayersSection() {
                   <ZoomToLayerButton layer={layer} />
                   <ExportButton
                     endpoint={`/api/v1/layers/${layer.id}/export`}
-                    body={{}}
                     filenameBase={layer.name}
                     label=""
-                    confirmBeforeDownload
+                    requireBounds
                   />
                 </div>
               )}

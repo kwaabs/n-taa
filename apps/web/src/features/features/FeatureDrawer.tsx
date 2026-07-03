@@ -26,6 +26,8 @@ import { useLayoutStore } from "@/app/layout/store/layoutStore";
 import { useTraceFeeder, isTraceable, companionLabel } from "./traceHooks";
 import { useTraceStore, type FeederSegmentInfo } from "./traceStore";
 
+import { toastSuccess, toastError } from "@/features/notifications/store";
+
 // ─── helpers ─────────────────────────────────────────────
 
 function isAuditField(key: string): boolean {
@@ -642,12 +644,7 @@ function TracePanel({
 
   const onTrace = () => {
     trace.mutate(
-      {
-        layerId,
-        ogcFid,
-        includeCompanion,
-        includeTransformers,
-      },
+      { layerId, ogcFid, includeCompanion, includeTransformers },
       {
         onSuccess: (r) => {
           traceStore.set({
@@ -673,6 +670,17 @@ function TracePanel({
             transformerCount: r.transformer_count,
             transformers: r.transformers,
           });
+
+          toastSuccess(
+            "Feeder traced",
+            `${r.feeder_key} · ${formatLength(r.total_length_m)} · ${r.segment_count} segments`,
+          );
+        },
+        onError: (err) => {
+          toastError(
+            "Trace failed",
+            (err as { message?: string })?.message ?? "Unknown error",
+          );
         },
       },
     );

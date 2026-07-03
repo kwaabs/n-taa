@@ -5,6 +5,7 @@ import (
     "database/sql"
     "errors"
     "time"
+    "strings"
 
     "github.com/google/uuid"
     "github.com/uptrace/bun"
@@ -81,5 +82,46 @@ func (r *Repo) RevokeRefresh(ctx context.Context, id uuid.UUID) error {
         Set("revoked_at = ?", now).
         Where("id = ? AND revoked_at IS NULL", id).
         Exec(ctx)
+    return err
+}
+
+
+func (r *Repo) ListUsers(ctx context.Context, f UserListFilter, offset, limit int) ([]*User, int64, error) {
+    q := r.db.NewSelect().Model((*User)(nil))
+
+    if f.Search != "" {
+        like := "%" + strings.ToLower(f.Search) + "%"
+        q = q.Where("lower(email) LIKE ? OR lower(display_name) LIKE ?", like, like)
+    }
+    if f.AuthSource != "" {
+        q = q.Where("auth_source = ?", f.AuthSource)
+    }
+    if f.Status != "" {
+        q = q.Where("status = ?", f.Status)
+    }
+    if f.Role != "" {
+        q = q.Where("role = ?", f.Role)
+    }
+
+    total, err := q.Count(ctx)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    users := []*User{}
+    err = q.Order("created_at DESC").
+        Offset(offset).
+        Limit(limit).
+        Scan(ctx, &users)
+    if err != nil {
+        return nil, 0, err
+    }
+
+    return users, int64(total), nil
+}
+
+func (r *Repo) UpdateUser(ctx context.Context, u *User) error {
+    u.UpdatedAt = time.Now()
+    _, err := r.db.NewUpdate().Model(u).WherePK().Exec(ctx)
     return err
 }
