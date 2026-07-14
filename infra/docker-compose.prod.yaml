@@ -30,13 +30,7 @@ services:
       - app_net
     # No labels, no ports -> stays private on the stack network (correct for a DB)
     healthcheck:
-      test:
-        - CMD
-        - pg_isready
-        - '-U'
-        - supabase_admin
-        - '-d'
-        - '${POSTGRES_DB}'
+      test: [CMD, pg_isready, '-U', supabase_admin, '-d', '${POSTGRES_DB}']
       interval: 10s
       timeout: 5s
       retries: 20
