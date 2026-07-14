@@ -25,7 +25,7 @@ services:
       APP_DB_PASSWORD: '${APP_DB_PASSWORD}'
     volumes:
       - 'postgres_data:/var/lib/postgresql/data'
-      - './postgres/bootstrap.sql:/docker-entrypoint-initdb.d/01-bootstrap.sql:ro'
+      - './infra/postgres/bootstrap.sql:/docker-entrypoint-initdb.d/01-bootstrap.sql:ro'
     networks:
       - app_net
     # No labels, no ports -> stays private on the stack network (correct for a DB)
@@ -49,7 +49,7 @@ services:
     environment:
       DATABASE_URL: 'postgres://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable'
     volumes:
-      - './martin/config.yaml:/config.yaml:ro'
+      - './infra/martin/config.yaml:/config.yaml:ro'
     command:
       - '--config'
       - /config.yaml
