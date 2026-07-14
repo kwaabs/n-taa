@@ -14,48 +14,68 @@ volumes:
     driver: local
 
 services:
-  # ─── Postgres (Supabase PostGIS-enabled image) ──────────
   postgres:
-    image: supabase/postgres:15.1.1.55
+    image: 'supabase/postgres:15.1.1.55'
     container_name: geo-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-      APP_DB_USER: ${APP_DB_USER}
-      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD}'
+      POSTGRES_DB: '${POSTGRES_DB}'
+      APP_DB_USER: '${APP_DB_USER}'
+      APP_DB_PASSWORD: '${APP_DB_PASSWORD}'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./postgres/bootstrap.sql:/docker-entrypoint-initdb.d/01-bootstrap.sql:ro
+      - 'postgres_data:/var/lib/postgresql/data'
+      - './postgres/bootstrap.sql:/docker-entrypoint-initdb.d/01-bootstrap.sql:ro'
     networks:
       - app_net
+    # No labels, no ports -> stays private on the stack network (correct for a DB)
     healthcheck:
       test:
-        ["CMD", "pg_isready", "-U", "supabase_admin", "-d", "${POSTGRES_DB}"]
+        - CMD
+        - pg_isready
+        - '-U'
+        - supabase_admin
+        - '-d'
+        - '${POSTGRES_DB}'
       interval: 10s
       timeout: 5s
       retries: 20
       start_period: 60s
 
-  # ─── Martin tile server ────────────────────────────────
   martin:
-    image: ghcr.io/maplibre/martin:latest
+    image: 'ghcr.io/maplibre/martin:latest'
     container_name: geo-martin
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      DATABASE_URL: 'postgres://${APP_DB_USER}:${APP_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable'
     volumes:
-      - ./martin/config.yaml:/config.yaml:ro
-    command: ["--config", "/config.yaml"]
+      - './martin/config.yaml:/config.yaml:ro'
+    command:
+      - '--config'
+      - /config.yaml
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - app_net
-    ports:
-      - "5441:3000"
+    # Exposed on its own subdomain (tiles server serves from root path)
+    labels:
+      - traefik.enable=true
+      # HTTP router -> redirect to HTTPS
+      - traefik.http.routers.geo-martin-http.entryPoints=http
+      - 'traefik.http.routers.geo-martin-http.rule=Host(`tiles.example.com`)'
+      - traefik.http.routers.geo-martin-http.service=geo-martin-svc
+      - traefik.http.routers.geo-martin-http.middlewares=redirect-to-https
+      # HTTPS router
+      - traefik.http.routers.geo-martin-https.entryPoints=https
+      - 'traefik.http.routers.geo-martin-https.rule=Host(`tiles.example.com`)'
+      - traefik.http.routers.geo-martin-https.service=geo-martin-svc
+      - traefik.http.routers.geo-martin-https.tls=true
+      - traefik.http.routers.geo-martin-https.tls.certresolver=letsencrypt
+      - traefik.http.routers.geo-martin-https.middlewares=gzip
+      # Backend port inside the container
+      - traefik.http.services.geo-martin-svc.loadbalancer.server.port=3000
 
-  # ─── Go API ────────────────────────────────────────────
   api:
     build:
       context: services/api
@@ -63,43 +83,61 @@ services:
     container_name: geo-api
     restart: unless-stopped
     environment:
-      API_ENV: ${API_ENV}
-      API_LOG_LEVEL: ${API_LOG_LEVEL}
-      API_HOST: ${API_HOST}
-      API_PORT: ${API_PORT}
-      DATABASE_URL: ${DATABASE_URL}
-      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS}
-      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS}
-      DB_CONN_MAX_LIFETIME: ${DB_CONN_MAX_LIFETIME}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
-      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY}
-      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL}
-      JWT_REFRESH_TTL: ${JWT_REFRESH_TTL}
-      JWT_ISSUER: ${JWT_ISSUER}
-      SUPERUSER_EMAIL: ${SUPERUSER_EMAIL}
-      SUPERUSER_PASSWORD: ${SUPERUSER_PASSWORD}
-      SUPERUSER_NAME: ${SUPERUSER_NAME}
-      COOKIE_DOMAIN: ${COOKIE_DOMAIN}
-      COOKIE_SECURE: ${COOKIE_SECURE}
+      API_ENV: '${API_ENV}'
+      API_LOG_LEVEL: '${API_LOG_LEVEL}'
+      API_HOST: '${API_HOST}'
+      API_PORT: '${API_PORT}'
+      DATABASE_URL: '${DATABASE_URL}'
+      DB_MAX_OPEN_CONNS: '${DB_MAX_OPEN_CONNS}'
+      DB_MAX_IDLE_CONNS: '${DB_MAX_IDLE_CONNS}'
+      DB_CONN_MAX_LIFETIME: '${DB_CONN_MAX_LIFETIME}'
+      CORS_ALLOWED_ORIGINS: '${CORS_ALLOWED_ORIGINS}'
+      JWT_SIGNING_KEY: '${JWT_SIGNING_KEY}'
+      JWT_ACCESS_TTL: '${JWT_ACCESS_TTL}'
+      JWT_REFRESH_TTL: '${JWT_REFRESH_TTL}'
+      JWT_ISSUER: '${JWT_ISSUER}'
+      SUPERUSER_EMAIL: '${SUPERUSER_EMAIL}'
+      SUPERUSER_PASSWORD: '${SUPERUSER_PASSWORD}'
+      SUPERUSER_NAME: '${SUPERUSER_NAME}'
+      COOKIE_DOMAIN: '${COOKIE_DOMAIN}'
+      COOKIE_SECURE: '${COOKIE_SECURE}'
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - app_net
+    # Same host as the web app, routed under /api (so web's VITE_API_URL='' works same-origin)
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.geo-api-http.entryPoints=http
+      - 'traefik.http.routers.geo-api-http.rule=Host(`app.example.com`) && PathPrefix(`/api`)'
+      - traefik.http.routers.geo-api-http.service=geo-api-svc
+      - traefik.http.routers.geo-api-http.middlewares=redirect-to-https
+      - traefik.http.routers.geo-api-https.entryPoints=https
+      - 'traefik.http.routers.geo-api-https.rule=Host(`app.example.com`) && PathPrefix(`/api`)'
+      - traefik.http.routers.geo-api-https.service=geo-api-svc
+      - traefik.http.routers.geo-api-https.tls=true
+      - traefik.http.routers.geo-api-https.tls.certresolver=letsencrypt
+      - traefik.http.routers.geo-api-https.middlewares=gzip
+      # IMPORTANT: must match your API_PORT (healthcheck implies 5442)
+      - traefik.http.services.geo-api-svc.loadbalancer.server.port=5442
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:5442/healthz"]
+      test:
+        - CMD
+        - curl
+        - '-fsS'
+        - 'http://localhost:5442/healthz'
       interval: 15s
       timeout: 3s
       retries: 5
       start_period: 30s
 
-  # ─── Frontend (nginx serving built Vite bundle + API proxy) ──
   web:
     build:
       context: apps/web
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ""
+        VITE_API_URL: ''
     container_name: geo-web
     restart: unless-stopped
     depends_on:
@@ -107,10 +145,26 @@ services:
         condition: service_healthy
     networks:
       - app_net
-    ports:
-      - "80:80"
+    # Root of the domain (catch-all). /api is more specific so it wins for API calls.
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.geo-web-http.entryPoints=http
+      - 'traefik.http.routers.geo-web-http.rule=Host(`app.example.com`)'
+      - traefik.http.routers.geo-web-http.service=geo-web-svc
+      - traefik.http.routers.geo-web-http.middlewares=redirect-to-https
+      - traefik.http.routers.geo-web-https.entryPoints=https
+      - 'traefik.http.routers.geo-web-https.rule=Host(`app.example.com`)'
+      - traefik.http.routers.geo-web-https.service=geo-web-svc
+      - traefik.http.routers.geo-web-https.tls=true
+      - traefik.http.routers.geo-web-https.tls.certresolver=letsencrypt
+      - traefik.http.routers.geo-web-https.middlewares=gzip
+      - traefik.http.services.geo-web-svc.loadbalancer.server.port=80
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost/healthz"]
+      test:
+        - CMD
+        - wget
+        - '-qO-'
+        - 'http://localhost/healthz'
       interval: 30s
       timeout: 3s
       retries: 3
