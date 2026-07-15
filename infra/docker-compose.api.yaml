@@ -1,0 +1,56 @@
+name: geo-api-prod
+
+networks:
+  app_net:
+    driver: bridge
+
+services:
+  api:
+    build:
+      context: services/api
+      dockerfile: Dockerfile
+    container_name: geo-api
+    restart: unless-stopped
+    environment:
+      API_ENV: '${API_ENV}'
+      API_LOG_LEVEL: '${API_LOG_LEVEL}'
+      API_HOST: '${API_HOST}'
+      API_PORT: '${API_PORT}'
+      DATABASE_URL: '${DATABASE_URL}'
+      DB_MAX_OPEN_CONNS: '${DB_MAX_OPEN_CONNS}'
+      DB_MAX_IDLE_CONNS: '${DB_MAX_IDLE_CONNS}'
+      DB_CONN_MAX_LIFETIME: '${DB_CONN_MAX_LIFETIME}'
+      CORS_ALLOWED_ORIGINS: '${CORS_ALLOWED_ORIGINS}'
+      JWT_SIGNING_KEY: '${JWT_SIGNING_KEY}'
+      JWT_ACCESS_TTL: '${JWT_ACCESS_TTL}'
+      JWT_REFRESH_TTL: '${JWT_REFRESH_TTL}'
+      JWT_ISSUER: '${JWT_ISSUER}'
+      SUPERUSER_EMAIL: '${SUPERUSER_EMAIL}'
+      SUPERUSER_PASSWORD: '${SUPERUSER_PASSWORD}'
+      SUPERUSER_NAME: '${SUPERUSER_NAME}'
+      COOKIE_DOMAIN: '${COOKIE_DOMAIN}'
+      COOKIE_SECURE: '${COOKIE_SECURE}'
+    networks:
+      - app_net
+    labels:
+      - traefik.enable=true
+      # HTTP -> redirect to HTTPS
+      - traefik.http.routers.geo-api-http.entryPoints=http
+      - 'traefik.http.routers.geo-api-http.rule=Host(`api.example.com`)'
+      - traefik.http.routers.geo-api-http.service=geo-api-svc
+      - traefik.http.routers.geo-api-http.middlewares=redirect-to-https
+      # HTTPS
+      - traefik.http.routers.geo-api-https.entryPoints=https
+      - 'traefik.http.routers.geo-api-https.rule=Host(`api.example.com`)'
+      - traefik.http.routers.geo-api-https.service=geo-api-svc
+      - traefik.http.routers.geo-api-https.tls=true
+      - traefik.http.routers.geo-api-https.tls.certresolver=letsencrypt
+      - traefik.http.routers.geo-api-https.middlewares=gzip
+      # Must match API_PORT
+      - traefik.http.services.geo-api-svc.loadbalancer.server.port=5442
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:5442/healthz']
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 30s

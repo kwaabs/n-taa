@@ -7,6 +7,9 @@ import { MapProvider } from "@/features/map/context/MapContext";
 import { MapCanvas } from "@/features/map/components/MapCanvas";
 import { MapToolCluster } from "@/features/map/components/MapToolCluster";
 import { LoginScreen } from "@/features/auth/LoginScreen";
+
+import { AzureCallback } from "@/features/auth/AzureCallback";
+
 import { FeatureDrawer } from "@/features/features/FeatureDrawer";
 import { useAuthStore } from "@/features/auth/store";
 import { bootstrapAuth } from "@/features/auth/hooks";
@@ -23,20 +26,6 @@ import { ToastContainer } from "@/features/notifications/ToastContainer";
 import { AdminModal } from "@/features/admin/AdminModal";
 
 function AuthGate() {
-  // Detect Azure OAuth callback at any URL — Microsoft redirects here after sign-in
-  // with ?code=...&state=... in the query string.
-  const search = new URLSearchParams(window.location.search);
-  const isAzureCallback = search.has("code") && search.has("state");
-
-  if (isAzureCallback) {
-    return (
-      <>
-        <AzureCallback />
-        <ToastContainer />
-      </>
-    );
-  }
-
   const status = useAuthStore((s) => s.status);
   const setUser = useAuthStore((s) => s.setUser);
   const setStatus = useAuthStore((s) => s.setStatus);
@@ -60,6 +49,41 @@ function AuthGate() {
     };
   }, [setUser, setStatus]);
 
+  // If already authenticated, show the app regardless of URL
+  // (Handles the case where Azure callback just completed and set auth)
+  if (status === "authenticated") {
+    // Clean any lingering ?code=... from the URL
+    if (window.location.pathname === "/auth/azure/callback") {
+      window.history.replaceState({}, "", "/");
+    }
+    return (
+      <MapProvider>
+        <AppShell>
+          <MapCanvas />
+          <MapToolCluster />
+          <FeatureDrawer />
+          <ResultsTable />
+          <BufferMenu />
+          <PrintModal />
+        </AppShell>
+        <AdminModal />
+        <ToastContainer />
+      </MapProvider>
+    );
+  }
+
+  // Detect Azure OAuth callback — only shows if NOT already authenticated
+  const isAzureCallback = window.location.pathname === "/auth/azure/callback";
+
+  if (isAzureCallback) {
+    return (
+      <>
+        <AzureCallback />
+        <ToastContainer />
+      </>
+    );
+  }
+
   if (status === "loading") {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-slate-100">
@@ -77,20 +101,8 @@ function AuthGate() {
     );
   }
 
-  return (
-    <MapProvider>
-      <AppShell>
-        <MapCanvas />
-        <MapToolCluster />
-        <FeatureDrawer />
-        <ResultsTable />
-        <BufferMenu />
-        <PrintModal />
-      </AppShell>
-      <AdminModal />
-      <ToastContainer />
-    </MapProvider>
-  );
+  // Fallback (shouldn't reach here)
+  return null;
 }
 
 export default function App() {

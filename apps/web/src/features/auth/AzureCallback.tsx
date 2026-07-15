@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { useAzureCallback } from "./hooks";
 
+let processedCode: string | null = null;
+
 export function AzureCallback() {
   const azureCallback = useAzureCallback();
   const [pending, setPending] = useState<{
@@ -25,22 +27,28 @@ export function AzureCallback() {
       return;
     }
 
+    if (processedCode === code) return;
+    processedCode = code;
+
     azureCallback.mutate(
       { code, state },
       {
         onSuccess: (res) => {
+          console.log("[AzureCallback] onSuccess", res);
           if (res.pending) {
             setPending({
               email: res.user.email,
               name: res.user.display_name,
             });
-            // Clean the URL so ?code=... doesn't stick around
             window.history.replaceState({}, "", "/");
             return;
           }
-          window.location.href = "/";
+          // For non-pending, useAzureCallback hook already set auth state.
+          // AuthGate will re-render and show the map.
+          // No need to force navigation.
         },
         onError: (err) => {
+          console.error("[AzureCallback] onError", err);
           setError((err as { message?: string })?.message ?? "Sign-in failed");
         },
       },
@@ -88,6 +96,9 @@ function PendingApproval({ email, name }: { email: string; name: string }) {
       <p className="mt-4 text-xs text-slate-500">
         Please contact your administrator or try again later.
       </p>
+      <a className="py-2 text-sm font-medium text-white hover:bg-emerald-700">
+        Back to sign in
+      </a>
     </div>
   );
 }
@@ -106,7 +117,7 @@ function ErrorState({ error }: { error: string }) {
         Sign-in failed
       </h1>
       <p className="mt-2 text-sm text-slate-600">{error}</p>
-      <a className="emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+      <a className="mt-6 inline-block rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700">
         Back to sign in
       </a>
     </div>
