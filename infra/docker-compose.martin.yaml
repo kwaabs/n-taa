@@ -6,17 +6,18 @@ networks:
 
 services:
   martin:
-    image: 'ghcr.io/maplibre/martin:latest'
+    image: "ghcr.io/maplibre/martin:latest"
     container_name: geo-martin
     restart: unless-stopped
     environment:
-      # Point at the EXISTING Coolify-managed Postgres (same one the api uses)
-      DATABASE_URL: '${DATABASE_URL}'
-      SERVICE_FQDN_MARTIN_3000: 'https://tiles.ntaa.ecggh.com'   # your tiles domain
+      DATABASE_URL: "${DATABASE_URL}"
+      SERVICE_FQDN_MARTIN_3000: "https://tiles.ntaa.ecggh.com"
     networks:
       - coolify
+    labels:
+      - traefik.http.services.martin-yc9kltmghlnfazopejdzmnbz-martin.loadbalancer.server.port=3000
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/catalog"]
       interval: 15s
       timeout: 3s
       retries: 5
