@@ -1,8 +1,8 @@
 name: geo-web-prod
 
 networks:
-  app_net:
-    driver: bridge
+  coolify:
+    external: true
 
 services:
   web:
@@ -10,24 +10,13 @@ services:
       context: apps/web
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: 'https://api.example.com'
+        VITE_API_URL: 'https://api.example.com'   # your real api domain (build-time)
     container_name: geo-web
-    restart: unless-stopped
+    # no restart: line while stabilizing -> add "unless-stopped" later
+    environment:
+      SERVICE_FQDN_WEB_80: 'https://app.example.com'   # pinned = one clean URL, port 80
     networks:
-      - app_net
-    labels:
-      - traefik.enable=true
-      - traefik.http.routers.geo-web-http.entryPoints=http
-      - 'traefik.http.routers.geo-web-http.rule=Host(`app.example.com`)'
-      - traefik.http.routers.geo-web-http.service=geo-web-svc
-      - traefik.http.routers.geo-web-http.middlewares=redirect-to-https
-      - traefik.http.routers.geo-web-https.entryPoints=https
-      - 'traefik.http.routers.geo-web-https.rule=Host(`app.example.com`)'
-      - traefik.http.routers.geo-web-https.service=geo-web-svc
-      - traefik.http.routers.geo-web-https.tls=true
-      - traefik.http.routers.geo-web-https.tls.certresolver=letsencrypt
-      - traefik.http.routers.geo-web-https.middlewares=gzip
-      - traefik.http.services.geo-web-svc.loadbalancer.server.port=80
+      - coolify
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost/healthz']
       interval: 30s

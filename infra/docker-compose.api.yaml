@@ -10,7 +10,7 @@ services:
       context: services/api
       dockerfile: Dockerfile
     container_name: geo-api
-    restart: unless-stopped
+    # no restart: line  -> defaults to "no"
     environment:
       SERVICE_FQDN_API_5442: ''
       API_ENV: '${API_ENV}'
