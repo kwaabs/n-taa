@@ -14,12 +14,13 @@ import (
 )
 
 type Handler struct {
-    svc    *Service
-    logger *slog.Logger
+	svc           *Service
+	logger        *slog.Logger
+	martinBaseURL string
 }
 
-func NewHandler(svc *Service, logger *slog.Logger) *Handler {
-    return &Handler{svc: svc, logger: logger}
+func NewHandler(svc *Service, logger *slog.Logger, martinBaseURL string) *Handler {
+	return &Handler{svc: svc, logger: logger, martinBaseURL: martinBaseURL}
 }
 
 // ─── DTOs ─────────────────────────────────────────────
@@ -40,36 +41,36 @@ type layerDTO struct {
     Permissions    LayerPermissions `json:"permissions"`
 }
 
-func buildTileURL(schema, table string) string {
-    return "http://localhost:5441/" + schema + "." + table + "/{z}/{x}/{y}"
+func (h *Handler) buildTileURL(schema, table string) string {
+	return h.martinBaseURL + "/" + schema + "." + table + "/{z}/{x}/{y}"
 }
 
 // toDTO — single layer → DTO
-func toDTO(l *Layer) layerDTO {
-    return layerDTO{
-        ID:             l.ID.String(),
-        Name:           l.Name,
-        DisplayName:    l.DisplayName,
-        SchemaName:     l.SchemaName,
-        TableName:      l.TableName,
-        IDColumn:       l.IDColumn,
-        GeometryColumn: l.GeometryColumn,
-        GeometryType:   l.GeometryType,
-        SRID:           l.SRID,
-        Editable:       l.Editable,
-        Style:          l.Style,
-        TileURL:        buildTileURL(l.SchemaName, l.TableName),
-        Permissions:    l.Permissions,
-    }
+func (h *Handler) toDTO(l *Layer) layerDTO {
+	return layerDTO{
+		ID:             l.ID.String(),
+		Name:           l.Name,
+		DisplayName:    l.DisplayName,
+		SchemaName:     l.SchemaName,
+		TableName:      l.TableName,
+		IDColumn:       l.IDColumn,
+		GeometryColumn: l.GeometryColumn,
+		GeometryType:   l.GeometryType,
+		SRID:           l.SRID,
+		Editable:       l.Editable,
+		Style:          l.Style,
+		TileURL:        h.buildTileURL(l.SchemaName, l.TableName),
+		Permissions:    l.Permissions,
+	}
 }
 
 // toDTOs — slice of layers → slice of DTOs
-func toDTOs(ls []Layer) []layerDTO {
-    out := make([]layerDTO, 0, len(ls))
-    for i := range ls {
-        out = append(out, toDTO(&ls[i]))
-    }
-    return out
+func (h *Handler) toDTOs(ls []Layer) []layerDTO {
+	out := make([]layerDTO, 0, len(ls))
+	for i := range ls {
+		out = append(out, h.toDTO(&ls[i]))
+	}
+	return out
 }
 
 // ─── Context helpers ──────────────────────────────────
@@ -132,7 +133,7 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
         httpx.Internal(w, h.logger, err)
         return
     }
-    httpx.JSON(w, http.StatusOK, toDTOs(layers))
+    httpx.JSON(w, http.StatusOK, h.toDTOs(layers))
 }
 
 // GET /api/v1/layers/{id}
@@ -156,7 +157,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
         httpx.Internal(w, h.logger, err)
         return
     }
-    httpx.JSON(w, http.StatusOK, toDTO(l))
+    httpx.JSON(w, http.StatusOK, h.toDTO(l))
 }
 
 // POST /api/v1/layers
@@ -226,7 +227,7 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
         }
         return
     }
-    httpx.JSON(w, http.StatusOK, toDTO(l))
+    httpx.JSON(w, http.StatusOK, h.toDTO(l))
 }
 
 // DELETE /api/v1/layers/{id}
@@ -282,5 +283,5 @@ func (h *Handler) UpdatePermissions(w http.ResponseWriter, r *http.Request) {
         httpx.Internal(w, h.logger, err)
         return
     }
-    httpx.JSON(w, http.StatusOK, toDTO(updated))
+    httpx.JSON(w, http.StatusOK, h.toDTO(updated))
 }

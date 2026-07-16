@@ -31,6 +31,8 @@ type Config struct {
 
     CORSAllowedOrigins []string
 
+    MartinBaseURL string // <-- ADD THIS
+
     JWTSigningKey string
     JWTAccessTTL  time.Duration
     JWTRefreshTTL time.Duration
@@ -58,6 +60,8 @@ func Load() (*Config, error) {
         DBConnMaxLifetime: getEnvDuration("DB_CONN_MAX_LIFETIME", 30*time.Minute),
 
         CORSAllowedOrigins: splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173")),
+
+        MartinBaseURL: getEnv("MARTIN_BASE_URL", "http://localhost:5441"),   // <-- ADD THIS
 
         JWTSigningKey: getEnv("JWT_SIGNING_KEY", ""),
         JWTAccessTTL:  getEnvDuration("JWT_ACCESS_TTL", 15*time.Minute),

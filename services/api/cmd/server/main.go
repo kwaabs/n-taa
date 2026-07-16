@@ -71,7 +71,7 @@ func run() error {
     layersRepo := layers.NewRepo(database)
     layersProbe := db.NewProbe(database)
     layersSvc := layers.NewService(layersRepo, layersProbe)
-    layersHandler := layers.NewHandler(layersSvc, logger)
+    layersHandler := layers.NewHandler(layersSvc, logger, cfg.MartinBaseURL)
 
     // Features wiring
     featuresRepo := features.NewRepo(database)
