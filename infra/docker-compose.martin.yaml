@@ -1,0 +1,23 @@
+name: geo-martin-prod
+
+networks:
+  coolify:
+    external: true
+
+services:
+  martin:
+    image: 'ghcr.io/maplibre/martin:latest'
+    container_name: geo-martin
+    restart: unless-stopped
+    environment:
+      # Point at the EXISTING Coolify-managed Postgres (same one the api uses)
+      DATABASE_URL: '${DATABASE_URL}'
+      SERVICE_FQDN_MARTIN_3000: 'https://tiles.ntaa.ecggh.com'   # your tiles domain
+    networks:
+      - coolify
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/health']
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
