@@ -12,6 +12,10 @@ cors:
     - "http://localhost:5173"
     - "http://localhost:5442"
     - "http://localhost:3000"
+    - "http://taa-svr.ntaa.ecggh.com"
+    - "https://taa-svr.ntaa.ecggh.com"
+    - "http://taa-api-svr.ntaa.ecggh.com"
+    - "https://taa-api-svr.ntaa.ecggh.com"
 
 postgres:
   connection_string: ${DATABASE_URL}
