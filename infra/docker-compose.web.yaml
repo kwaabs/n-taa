@@ -10,11 +10,10 @@ services:
       context: apps/web
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: 'https://api.example.com'   # your real api domain (build-time)
+        VITE_API_URL: 'https://taa-svr.ntaa.ecggh.com'   # baked at build time
     container_name: geo-web
-    # no restart: line while stabilizing -> add "unless-stopped" later
     environment:
-      SERVICE_FQDN_WEB_80: 'https://app.example.com'   # pinned = one clean URL, port 80
+      SERVICE_FQDN_WEB_80: 'https://<your-web-domain>'    # Coolify routing hint
     networks:
       - coolify
     healthcheck:
