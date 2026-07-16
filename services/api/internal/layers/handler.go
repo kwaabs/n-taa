@@ -42,7 +42,7 @@ type layerDTO struct {
 }
 
 func (h *Handler) buildTileURL(schema, table string) string {
-	return h.martinBaseURL + "/" + schema + "." + table + "/{z}/{x}/{y}"
+	return h.martinBaseURL + "/" + table + "/{z}/{x}/{y}"
 }
 
 // toDTO — single layer → DTO
