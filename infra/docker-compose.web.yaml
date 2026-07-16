@@ -10,14 +10,14 @@ services:
       context: apps/web
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: 'https://taa-api-svr.ntaa.ecggh.com' #baked at build time
+        VITE_API_URL: 'https://taa-api-svr.ntaa.ecggh.com'
     container_name: geo-web
     environment:
-      SERVICE_FQDN_WEB_80: 'https://<your-web-domain>'    # Coolify routing hint
+      SERVICE_FQDN_WEB_80: 'https://taa-svr.ntaa.ecggh.com'
     networks:
       - coolify
     healthcheck:
-      test: ['CMD', 'wget', '-qO-', 'http://localhost/healthz']
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/']   # <-- 127.0.0.1 (IPv4), not localhost
       interval: 30s
       timeout: 3s
       retries: 3
