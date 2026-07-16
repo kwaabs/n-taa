@@ -3,6 +3,15 @@ name: geo-api-prod
 networks:
   app_net:
     driver: bridge
+  coolify:
+    external: true
+
+services:
+  api:
+    networks:
+      - app_net
+      - coolify
+
 
 services:
   api:
