@@ -46,7 +46,7 @@ func (h *Handler) buildTileURL(schema, table string) string {
 }
 
 // toDTO — single layer → DTO
-func (h *Handler) h.toDTO(l *Layer) layerDTO {
+func (h *Handler) toDTO(l *Layer) layerDTO {
 	return layerDTO{
 		ID:             l.ID.String(),
 		Name:           l.Name,
@@ -65,7 +65,7 @@ func (h *Handler) h.toDTO(l *Layer) layerDTO {
 }
 
 // toDTOs — slice of layers → slice of DTOs
-func (h *Handler) h.toDTOs(ls []Layer) []layerDTO {
+func (h *Handler) toDTOs(ls []Layer) []layerDTO {
 	out := make([]layerDTO, 0, len(ls))
 	for i := range ls {
 		out = append(out, h.toDTO(&ls[i]))
