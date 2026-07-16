@@ -10,7 +10,7 @@ services:
       context: apps/web
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: 'https://taa-svr.ntaa.ecggh.com'   # baked at build time
+        VITE_API_URL: 'https://taa-api-svr.ntaa.ecggh.com' #baked at build time
     container_name: geo-web
     environment:
       SERVICE_FQDN_WEB_80: 'https://<your-web-domain>'    # Coolify routing hint
