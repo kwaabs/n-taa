@@ -12,9 +12,13 @@ import {
   MousePointer2,
   Copy,
   Ruler as ScaleIcon,
+  Map as MapIcon,
+  MapPinOff,
 } from "lucide-react";
 import { useMapContext } from "../context/MapContext";
 import { useToolClusterStore } from "../store/toolClusterStore";
+
+import { useBasemapToggle } from "../hooks/useBasemapToggle"; // add import
 
 // Existing tool stores
 import { useMeasureStore } from "@/features/spatial/measureStore";
@@ -68,6 +72,9 @@ export function MapToolCluster() {
   const [zoom, setZoom] = useState(0);
   const [scale, setScale] = useState<ScaleReading | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const { setBasemapVisible } = useBasemapToggle();
+  const [basemapOn, setBasemapOn] = useState(true);
 
   useEffect(() => {
     const map = getMap();
@@ -172,6 +179,29 @@ export function MapToolCluster() {
           <>
             <ChevronUp className="h-3 w-3" />
             Map tools
+          </>
+        )}
+      </button>
+
+      {/* Basemap toggle — for printing/export */}
+      <button
+        onClick={() => {
+          const next = !basemapOn;
+          setBasemapOn(next);
+          setBasemapVisible(getMap(), next);
+        }}
+        className="flex items-center gap-1 rounded-md border border-slate-200 bg-white/95 px-2 py-1 text-xs text-slate-600 shadow-md backdrop-blur hover:bg-slate-50"
+        title={basemapOn ? "Hide basemap (for printing)" : "Show basemap"}
+      >
+        {basemapOn ? (
+          <>
+            <MapPinOff className="h-3 w-3" />
+            Basemap off
+          </>
+        ) : (
+          <>
+            <MapIcon className="h-3 w-3" />
+            Basemap on
           </>
         )}
       </button>
