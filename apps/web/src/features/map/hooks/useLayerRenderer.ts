@@ -52,7 +52,8 @@ function addLayerToMap(map: maplibregl.Map, layer: Layer) {
     maxzoom: 22,
   });
 
-  const sourceLayer = `${layer.schema_name}.${layer.table_name}`;
+  // const sourceLayer = `${layer.schema_name}.${layer.table_name}`;
+  const sourceLayer = layer.table_name;
   applyLayerStyle(map, layer, sourceId, sourceLayer);
 }
 
